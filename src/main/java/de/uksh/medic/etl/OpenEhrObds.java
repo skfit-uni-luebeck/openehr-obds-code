@@ -1,5 +1,6 @@
 package de.uksh.medic.etl;
 
+import de.uksh.medic.etl.jobs.FhirResolver;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrLogin;
 import de.uksh.medic.etl.settings.ConfigurationLoader;
 import de.uksh.medic.etl.settings.CxxMdrSettings;
@@ -24,6 +25,7 @@ public final class OpenEhrObds {
 
         //ToDo: Replace with Kafka consumer
 
+        FhirResolver.initalize();
         CxxMdrSettings mdrSettings = Settings.getCxxmdr();
         if (mdrSettings != null) {
             CxxMdrLogin.login(mdrSettings);
