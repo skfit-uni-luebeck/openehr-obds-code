@@ -1,0 +1,8 @@
+version: "3"
+services:
+  openehr-obds:
+    restart: unless-stopped
+    build: ./
+    command: "/app/settings.yml"
+    volumes:
+      - "./settings.yml:/app/settings.yml"
