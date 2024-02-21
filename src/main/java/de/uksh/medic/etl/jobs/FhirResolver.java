@@ -68,4 +68,26 @@ public final class FhirResolver {
         return new Coding();
     }
 
+    public static String lookUp(URI source, String version, String code) {
+        Parameters params = new Parameters();
+        params.addParameter("system", new UriType(source));
+        params.addParameter("code", code);
+        params.addParameter("version", version);
+        try {
+            Parameters result = terminologyClient.operation().onType(CodeSystem.class)
+                    .named("lookup").withParameters(params).execute();
+
+            for (ParametersParameterComponent p : result.getParameter()) {
+                if ("display".equals(p.getName()) && p.getValue() instanceof StringType) {
+                    return ((StringType) p.getValue()).asStringValue();
+                }
+            }
+
+        } catch (FhirClientConnectionException e) {
+            Logger.error("Could not connect to FHIR Terminology Server", e);
+        }
+
+        return null;
+    }
+
 }
