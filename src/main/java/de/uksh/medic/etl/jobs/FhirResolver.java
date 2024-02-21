@@ -68,9 +68,9 @@ public final class FhirResolver {
         return new Coding();
     }
 
-    public static String lookUp(URI source, String version, String code) {
+    public static String lookUp(URI system, String version, String code) {
         Parameters params = new Parameters();
-        params.addParameter("system", new UriType(source));
+        params.addParameter("system", new UriType(system));
         params.addParameter("code", code);
         params.addParameter("version", version);
         try {
