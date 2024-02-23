@@ -11,4 +11,5 @@ mapping:
     sourceVersion: 1
     target: 
     targetVersion: 1
+    split: false
 depthLimit: 4

@@ -9,6 +9,7 @@ public class Mapping {
     private String sourceVersion;
     private String target;
     private String targetVersion;
+    private boolean split;
 
     public String getSource() {
         return source;
@@ -40,6 +41,14 @@ public class Mapping {
 
     public void setTargetVersion(String targetVersion) {
         this.targetVersion = targetVersion;
+    }
+
+    public boolean getSplit() {
+        return split;
+    }
+
+    public void setSplit(boolean split) {
+        this.split = split;
     }
 
 }
