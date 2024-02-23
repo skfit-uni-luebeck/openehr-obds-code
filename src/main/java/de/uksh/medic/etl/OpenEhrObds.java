@@ -8,26 +8,32 @@ import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrAttributes;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrConvert;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrItemSet;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrLogin;
-import de.uksh.medic.etl.model.FhirAttributes;
+import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxItemSet;
 import de.uksh.medic.etl.model.mdr.centraxx.RelationConvert;
+import de.uksh.medic.etl.openehrmapper.EHRParser;
 import de.uksh.medic.etl.settings.ConfigurationLoader;
 import de.uksh.medic.etl.settings.CxxMdrSettings;
 import de.uksh.medic.etl.settings.Mapping;
 import de.uksh.medic.etl.settings.Settings;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathExpressionException;
 import org.tinylog.Logger;
+import org.xml.sax.SAXException;
 
 public final class OpenEhrObds {
 
-    private static final Map<String, Map<String, FhirAttributes>> ATTRIBUTE_CACHE = new HashMap<>();
+    private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
 
     private OpenEhrObds() {
     }
@@ -48,14 +54,17 @@ public final class OpenEhrObds {
         }
 
         Settings.getMapping().values().forEach(m -> {
+            if (m.getSource() == null) {
+                return;
+            }
             CxxItemSet is = CxxMdrItemSet.get(Settings.getCxxmdr(), m.getTarget());
             is.getItems().forEach(it -> {
                 try {
-                    if (!ATTRIBUTE_CACHE.containsKey(m.getTarget())) {
-                        ATTRIBUTE_CACHE.put(m.getTarget(), new HashMap<>());
+                    if (!FHIR_ATTRIBUTES.containsKey(m.getTarget())) {
+                        FHIR_ATTRIBUTES.put(m.getTarget(), new HashMap<>());
                     }
-                    ATTRIBUTE_CACHE.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
-                            CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), it.getId()));
+                    FHIR_ATTRIBUTES.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
+                            CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "fhir", it.getId()));
                 } catch (URISyntaxException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -67,68 +76,149 @@ public final class OpenEhrObds {
 
         // ToDo: Replace with Kafka consumer
 
-        File f = new File("file_1705482057-clean.xml");
+        File f = new File("tod.xml");
 
+        Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
-        }).entrySet(), 1, "");
+        }).entrySet(), 1, "", m);
 
         Logger.info("OpenEhrObds started!");
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static void walkXmlTree(Set<Map.Entry<String, Object>> xmlSet, int depth, String path) {
-        if (depth <= Settings.getDepthLimit()) {
-            if (Settings.getMapping().containsKey(path)) {
-                System.out.println("Mapping " + path);
+    @SuppressWarnings({ "unchecked" })
+    public static void walkXmlTree(Set<Map.Entry<String, Object>> xmlSet, int depth, String path,
+            Map<String, Object> resMap) {
 
-                RelationConvert conv = new RelationConvert();
-                Mapping m = Settings.getMapping().get(path);
-                conv.setSourceProfileCode(m.getSource());
-                conv.setTargetProfileCode(m.getTarget());
-                conv.setSourceProfileVersion(m.getSourceVersion());
-                conv.setTargetProfileVersion(m.getTargetVersion());
-                conv.setValues(xmlSet.stream()
-                        .collect(Collectors.toMap(Entry::getKey, Entry::getValue)));
+        if (depth > Settings.getDepthLimit()) {
+            return;
+        }
+        if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSource() != null) {
 
-                try {
-                    RelationConvert res = CxxMdrConvert.convert(Settings.getCxxmdr(), conv);
+            Mapping m = Settings.getMapping().get(path);
 
-                    res.getValues().entrySet().forEach(e -> {
-                        queryFhirTs(m, e);
-                    });
+            Map<String, Object> mapped = convertMdr(xmlSet, m);
+            mapped.entrySet().forEach(e -> queryFhirTs(m, e));
+            Map<String, Object> result = formatMap((Map<String, Object>) mapped);
 
-                    System.out.println(res);
-                } catch (JsonProcessingException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+            buildOpenEhrComposition(result);
+
+            resMap.putAll(result);
+
+        }
+
+        xmlSet.forEach(entry -> {
+            String newPath = path + "/" + entry.getKey();
+            int newDepth = depth + 1;
+
+            switch (entry.getValue()) {
+                case @SuppressWarnings("rawtypes") Map h -> {
+                    if (Settings.getMapping().containsKey(newPath)
+                            && Settings.getMapping().get(newPath).getSplit()) {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        System.out.println(entry.getKey());
+                        walkXmlTree(h.entrySet(), newDepth, newPath, m);
+                        resMap.put(newPath, List.of(m));
+                    } else {
+                        walkXmlTree(h.entrySet(), newDepth, newPath, resMap);
+                    }
+                }
+                case @SuppressWarnings("rawtypes") List a -> {
+
+                    if (Settings.getMapping().containsKey(newPath)
+                            && Settings.getMapping().get(newPath).getSplit()) {
+                        List<Map<String, Object>> l = new ArrayList<>();
+                        a.forEach(b -> {
+                            Map<String, Object> m = new LinkedHashMap<>();
+                            l.add(m);
+                            System.out.println(entry.getKey());
+                            walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, m);
+                        });
+                        resMap.put(newPath, l);
+                    } else {
+                        a.forEach(b -> {
+                            System.out.println(entry.getKey());
+                            walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, resMap);
+                        });
+                    }
+                }
+
+                default -> {
                 }
             }
+        });
 
-            xmlSet.forEach(entry -> {
-                String newPath = path + "/" + entry.getKey();
-                int newDepth = depth + 1;
+    }
 
-                switch (entry.getValue()) {
-                    case Map h -> {
-                        walkXmlTree(h.entrySet(), newDepth, newPath);
-                    }
-                    case List a -> a.forEach(b -> walkXmlTree(((Map) b).entrySet(), newDepth, newPath));
-                    default -> {
-                    }
-                }
-            });
+    @SuppressWarnings("unchecked")
+    private static void queryFhirTs(Mapping m, Map.Entry<String, Object> e) {
+        MappingAttributes fa = FHIR_ATTRIBUTES.get(m.getTarget()).get(e.getKey());
+        if (fa != null && fa.getSystem() != null) {
+            String code = switch (e.getValue()) {
+                case String c -> c;
+                case Map map -> ((Map<String, String>) map).get("code");
+                default -> null;
+            };
+            if (fa.getConceptMap() == null) {
+                String version = switch (e.getValue()) {
+                    case String c -> fa.getVersion();
+                    case Map map -> ((Map<String, String>) map).get("version");
+                    default -> null;
+                };
+                e.setValue(FhirResolver.lookUp(fa.getSystem(), version, code));
+            } else if (fa.getConceptMap() != null) {
+                e.setValue(FhirResolver.conceptMap(fa.getConceptMap(), fa.getId(), fa.getSource(),
+                        fa.getTarget(), code));
+            }
         }
     }
 
-    private static void queryFhirTs(Mapping m, Map.Entry<String, Object> e) {
-        FhirAttributes fa = ATTRIBUTE_CACHE.get(m.getTarget()).getOrDefault(e.getKey(), null);
-        if (fa != null) {
-            if (fa.getVersion() != null) {
-                e.setValue(FhirResolver.lookUp(fa.getSystem(), fa.getVersion(), (String) e.getValue()));
-            } else if (fa.getConceptMap() != null) {
-                e.setValue(FhirResolver.conceptMap(fa.getConceptMap(), fa.getId(), fa.getSource(),
-                        fa.getTarget(), (String) e.getValue()).getCode());
-            }
+    private static Map<String, Object> formatMap(Map<String, Object> input) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (Entry<String, Object> e : input.entrySet()) {
+            ArrayList<String> al = new ArrayList<>();
+            al.addAll(Arrays.asList(e.getKey().split("/")));
+            splitMap(e.getValue(), al, out);
+        }
+        return out;
+    }
+
+    @SuppressWarnings({ "unchecked" })
+    private static void splitMap(Object value, List<String> key, Map<String, Object> out) {
+        if (key.size() > 1) {
+            String k = key.removeFirst();
+            Map<String, Object> m = (Map<String, Object>) out.getOrDefault(k,
+                    new LinkedHashMap<>());
+            out.put(k, m);
+            splitMap(value, key, m);
+        } else if (key.size() == 1) {
+            out.put(key.removeFirst(), value);
+        }
+    }
+
+    private static Map<String, Object> convertMdr(Set<Map.Entry<String, Object>> xmlSet, Mapping m) {
+        RelationConvert conv = new RelationConvert();
+        conv.setSourceProfileCode(m.getSource());
+        conv.setTargetProfileCode(m.getTarget());
+        conv.setSourceProfileVersion(m.getSourceVersion());
+        conv.setTargetProfileVersion(m.getTargetVersion());
+        conv.setValues(xmlSet.stream()
+                .collect(Collectors.toMap(Entry::getKey, Entry::getValue)));
+        try {
+            return CxxMdrConvert.convert(Settings.getCxxmdr(), conv).getValues();
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private static void buildOpenEhrComposition(Map<String, Object> data) {
+        EHRParser ep = new EHRParser();
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("output.json"))) {
+            writer.write(ep.build(data));
+        } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
 
