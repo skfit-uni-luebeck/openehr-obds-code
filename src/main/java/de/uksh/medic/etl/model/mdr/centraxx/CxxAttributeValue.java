@@ -1,6 +1,6 @@
 package de.uksh.medic.etl.model.mdr.centraxx;
 
-import de.uksh.medic.etl.model.mdr.MdrAttributes;
+import de.uksh.medic.etl.model.mdr.FhirAttributes;
 import java.util.List;
 
 /**
@@ -9,7 +9,7 @@ import java.util.List;
 public class CxxAttributeValue {
 
     private String domain;
-    private MdrAttributes attribute;
+    private FhirAttributes attribute;
     private String value;
     private List<CxxLinks> links;
 
@@ -17,7 +17,7 @@ public class CxxAttributeValue {
         return domain;
     }
 
-    public MdrAttributes getAttribute() {
+    public FhirAttributes getAttribute() {
         return attribute;
     }
 

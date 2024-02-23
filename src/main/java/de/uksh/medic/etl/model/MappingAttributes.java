@@ -72,12 +72,4 @@ public class MappingAttributes {
         this.version = version;
     }
 
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
-    }
-
 }

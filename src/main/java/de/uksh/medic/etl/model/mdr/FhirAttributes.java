@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 /**
  * Enum for Attributes queried from MDR.
  */
-public enum MdrAttributes {
+public enum FhirAttributes {
     /**
      * system attribute in MDR.
      */
@@ -42,7 +42,7 @@ public enum MdrAttributes {
 
     private final String label;
 
-    MdrAttributes(String label) {
+    FhirAttributes(String label) {
         this.label = label;
     }
 
@@ -58,8 +58,8 @@ public enum MdrAttributes {
      * @return corresponding Enum
      */
     @JsonCreator
-    public static MdrAttributes fromString(String s) {
-        for (MdrAttributes a : MdrAttributes.values()) {
+    public static FhirAttributes fromString(String s) {
+        for (FhirAttributes a : FhirAttributes.values()) {
             if (a.label.equalsIgnoreCase(s)) {
                 return a;
             }
