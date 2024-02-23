@@ -2,7 +2,7 @@ package de.uksh.medic.etl.model;
 
 import java.net.URI;
 
-public class FhirAttributes {
+public class MappingAttributes {
 
     private URI system;
     private URI source;
@@ -11,8 +11,9 @@ public class FhirAttributes {
     private String id;
     private String code;
     private String version;
+    private String path;
 
-    public FhirAttributes() {
+    public MappingAttributes() {
     }
 
     public URI getSystem() {
@@ -69,6 +70,14 @@ public class FhirAttributes {
 
     public void setVersion(String version) {
         this.version = version;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
     }
 
 }

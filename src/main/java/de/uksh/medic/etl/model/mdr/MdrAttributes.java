@@ -34,7 +34,11 @@ public enum MdrAttributes {
     /**
      * version attribute in MDR.
      */
-    VERSION("version");
+    VERSION("version"),
+    /**
+     * version attribute in MDR.
+     */
+    PATH("path");
 
     private final String label;
 

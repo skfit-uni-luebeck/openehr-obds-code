@@ -1,6 +1,6 @@
 package de.uksh.medic.etl.jobs.mdr.centraxx;
 
-import de.uksh.medic.etl.model.FhirAttributes;
+import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxAttributeValue;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxList;
 import de.uksh.medic.etl.settings.CxxMdrSettings;
@@ -35,7 +35,7 @@ public final class CxxMdrAttributes {
      * @return FhirAttributes object
      * @throws URISyntaxException
      */
-    public static FhirAttributes getAttributes(CxxMdrSettings mdr, String mdrProfile, String key)
+    public static MappingAttributes getAttributes(CxxMdrSettings mdr, String mdrProfile, String domain, String key)
             throws URISyntaxException {
 
         if (mdr.isTokenExpired()) {
@@ -44,7 +44,7 @@ public final class CxxMdrAttributes {
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.set("code", mdrProfile);
-        form.set("domainCode", "fhir");
+        form.set("domainCode", domain);
         form.set("itemCode", key);
 
         RestTemplate rt = new RestTemplate();
@@ -60,7 +60,7 @@ public final class CxxMdrAttributes {
                     new HttpEntity<>(headers), CxxList.class);
             CxxList l = response.getBody();
             if (l != null && l.getContent() != null) {
-                FhirAttributes ch = new FhirAttributes();
+                MappingAttributes ch = new MappingAttributes();
                 for (CxxAttributeValue av : l.getContent()) {
                     switch (av.getAttribute()) {
                         case SYSTEM -> ch.setSystem(new URI(av.getValue()));
@@ -70,6 +70,7 @@ public final class CxxMdrAttributes {
                         case CONCEPTMAP -> ch.setConceptMap(new URI(av.getValue()));
                         case CODE -> ch.setCode(av.getValue());
                         case VERSION -> ch.setVersion(av.getValue());
+                        case PATH -> ch.setPath(av.getValue());
                         default -> {
                         }
                     }
