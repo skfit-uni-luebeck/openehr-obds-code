@@ -2,9 +2,11 @@ package de.uksh.medic.etl.openehrmapper;
 
 import com.nedap.archie.rm.archetyped.Archetyped;
 import com.nedap.archie.rm.composition.Action;
+import com.nedap.archie.rm.composition.Activity;
 import com.nedap.archie.rm.composition.AdminEntry;
 import com.nedap.archie.rm.composition.ContentItem;
 import com.nedap.archie.rm.composition.Evaluation;
+import com.nedap.archie.rm.composition.Instruction;
 import com.nedap.archie.rm.composition.Observation;
 import com.nedap.archie.rm.composition.Section;
 import com.nedap.archie.rm.datastructures.Cluster;
@@ -187,25 +189,30 @@ public class Generator {
         // ((History<ItemStructure>) jsonmap).addEvent(events);
     }
 
+    @SuppressWarnings("unchecked")
     public static void gen_INSTRUCTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
-        String nodeId = getNodeId(path);
-        String label = getTypeLabel(path, nodeId);
-        // String newPath = path + "/attributes";
-        Action action = new Action();
-        action.setArchetypeNodeId(nodeId);
+        String paramName = getArcheTypeId(path);
+        String oap = path + "/attributes[rm_attribute_name=\"activities\"]";
+        Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
 
-        action.setNameAsString(label);
+        Instruction instruction = new Instruction();
+        instruction.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+        instruction.setArchetypeNodeId(paramName);
+        instruction.setNameAsString(getLabel(getNodeId(path), paramName));
+        instruction.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+        instruction.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+        instruction.setSubject(new PartySelf());
 
-        // events.setTime(new DvDateTime((String) map.get("events_time")));
-        // ItemTree itemTree = new ItemTree();
-        // processAttributeChildren(path, nodeId, itemTree, map);
-        // section.setItems(itemTree);
-
-        // ((History<ItemStructure>) jsonmap).addEvent(events);
+        if (map.containsKey(paramName)) {
+            List<Activity> activities = new ArrayList<>();
+            processAttributeChildren(oap, paramName, activities, (Map<String, Object>) map.get(paramName));
+            instruction.setActivities(activities);
+            if (oa) {
+                ((ArrayList<ContentItem>) jsonmap).add(instruction);
+            }
+        }
     }
-
-    // ACTIVITY
 
     public static void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
