@@ -214,6 +214,28 @@ public class Generator {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    public static void gen_ACTIVITY(String path, String name, Object jsonmap, Map<String, Object> map)
+            throws Exception {
+        String nodeId = getNodeId(path);
+        String oap = path + "/attributes[rm_attribute_name=\"description\"]";
+        Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+
+        Activity activity = new Activity();
+        // activity.setArchetypeDetails(new Archetyped(new ArchetypeID(nodeId), "1.1.0"));
+        activity.setArchetypeNodeId(nodeId);
+        activity.setNameAsString(getLabel(getNodeId(path), nodeId));
+
+        if (map.containsKey(nodeId)) {
+            ItemTree itemTree = new ItemTree();
+            processAttributeChildren(oap, nodeId, itemTree, (Map<String, Object>) map.get(nodeId));
+            activity.setDescription(itemTree);
+            if (oa) {
+                ((ArrayList<Activity>) jsonmap).add(activity);
+            }
+        }
+    }
+
     public static void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String nodeId = getNodeId(path);
