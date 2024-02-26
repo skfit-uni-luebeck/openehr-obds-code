@@ -307,7 +307,7 @@ public class Generator {
         Boolean isSlot = ((String) XP.evaluate(path + "/@type", opt, XPathConstants.STRING)).equals("C_ARCHETYPE_ROOT");
         String aNodeId = isSlot ? paramName : nodeId;
         String newPath = path + "/attributes";
-        String code = !"".equals(paramName) ? paramName : nodeId;
+        String code = !"".equals(paramName) && !name.equals(paramName) ? paramName : nodeId;
         if (!map.containsKey(code)) {
             return;
         }
