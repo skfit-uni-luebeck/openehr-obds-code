@@ -18,7 +18,6 @@ import com.nedap.archie.rm.datastructures.ItemStructure;
 import com.nedap.archie.rm.datastructures.ItemTree;
 import com.nedap.archie.rm.datastructures.PointEvent;
 import com.nedap.archie.rm.datatypes.CodePhrase;
-import com.nedap.archie.rm.datavalues.DataValue;
 import com.nedap.archie.rm.datavalues.DvBoolean;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvIdentifier;
@@ -203,6 +202,7 @@ public class Generator {
         instruction.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
         instruction.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
         instruction.setSubject(new PartySelf());
+        instruction.setNarrative(new DvText("asdf"));
 
         if (map.containsKey(paramName)) {
             List<Activity> activities = new ArrayList<>();
@@ -222,7 +222,7 @@ public class Generator {
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
 
         Activity activity = new Activity();
-        // activity.setArchetypeDetails(new Archetyped(new ArchetypeID(nodeId), "1.1.0"));
+        activity.setActionArchetypeId("openEHR-EHR-INSTRUCTION.service_request.v1");
         activity.setArchetypeNodeId(nodeId);
         activity.setNameAsString(getLabel(getNodeId(path), nodeId));
 
@@ -329,15 +329,18 @@ public class Generator {
         if (!map.containsKey(nodeId)) {
             return;
         }
+        String label = getLabel(nodeId, name);
 
-        Element el = new Element();
-        el.setArchetypeNodeId(nodeId);
-        el.setNameAsString(getLabel(nodeId, name));
-        switch (map.get(nodeId)) {
-            case DataValue d -> el.setValue(d);
-            default -> processAttributeChildren(newPath, nodeId, el, map);
-        }
-        ((ArrayList<Element>) jsonmap).add(el);
+        ((List) map.get(nodeId)).forEach(e -> {
+            Element el = new Element();
+            el.setArchetypeNodeId(nodeId);
+            el.setNameAsString(label);
+            Map<String, Object> mo = new HashMap<>();
+            mo.put(nodeId, e);
+            processAttributeChildren(newPath, nodeId, el, mo);
+            ((ArrayList<Element>) jsonmap).add(el);
+
+        });
     }
 
     // HISTORY Class descriptions
@@ -412,15 +415,29 @@ public class Generator {
     // CODE_PHRASE
 
     public static void gen_DV_CODED_TEXT(String path, String name, Object jsonmap,
-            Map<String, Coding> map) throws Exception {
-        Coding coding = map.get(name);
+            Map<String, Object> map) throws Exception {
+
         DvCodedText ct = new DvCodedText();
-        ct.setDefiningCode(new CodePhrase(
-                new TerminologyId("terminology://fhir.hl7.org//ValueSet/$expand?url=" + coding.getSystem(),
-                        coding.getVersion()),
-                coding.getCode()));
-        ct.setValue(coding.getCode());
-        ((Element) jsonmap).setValue(ct);
+        switch (map.get(name)) {
+            case Coding coding -> {
+                ct.setDefiningCode(new CodePhrase(
+                        new TerminologyId("terminology://fhir.hl7.org//ValueSet/$expand?url=" + coding.getSystem(),
+                                coding.getVersion()),
+                        coding.getCode(), coding.getDisplay()));
+                ct.setValue(coding.getDisplay());
+                ((Element) jsonmap).setValue(ct);
+            }
+            case String s -> {
+                String display = getLocalTerminologyTerm(path, s);
+                ct.setDefiningCode(new CodePhrase(
+                        new TerminologyId("local_terms"),
+                        s, display));
+                ct.setValue(display);
+                ((Element) jsonmap).setValue(ct);
+            }
+            default -> {
+            }
+        }
 
     }
 
@@ -514,6 +531,16 @@ public class Generator {
         return CACHE.get(newPath);
     }
 
+    private static String getLocalTerminologyTerm(String path, String code) throws Exception {
+        String newPath = "//term_definitions[@code=\"local_terms::" + code + "\"]/items/text()";
+        if (!CACHE.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            CACHE.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
+                    .replaceAll("\\n", " "));
+        }
+        return CACHE.get(newPath);
+    }
+
     private static String getNodeId(String path) throws Exception {
         String newPath = path + "/node_id";
         if (!CACHE.containsKey(newPath)) {
@@ -530,6 +557,71 @@ public class Generator {
             CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         return CACHE.get(newPath);
+    }
+
+    public static Map<String, Object> getDefaultValues() {
+        Map<String, Object> defaults = new HashMap<>();
+        Map<String, Object> current = defaults;
+        String path = "//constraints/attributes[children/default_value]";
+        try {
+            XPathExpression expr = XP.compile(path);
+            NodeList nl = (NodeList) expr.evaluate(opt, XPathConstants.NODESET);
+            for (int i = 1; i <= nl.getLength(); i++) {
+                XPathExpression exprC = XP.compile(path + "[" + i + "]/children/default_value/value/text()");
+                XPathExpression exprP = XP.compile(path + "[" + i + "]/differential_path/text()");
+                String value = (String) exprC.evaluate(opt, XPathConstants.STRING);
+                String differentialPath = ((String) exprP.evaluate(opt, XPathConstants.STRING)).trim();
+                List<String> l = List.of(differentialPath.split("/"));
+                String last = l.getLast().split("(\\[|\\])")[1];
+                for (int j = 1; j < l.size() - 1; j++) {
+                    String s = l.get(j);
+                    if (s.contains("description")) {
+                        continue;
+                    }
+                    Map<String, Object> n = new HashMap<>();
+                    String s2 = s.split("(\\[|\\])")[1];
+                    current.put(s2, n);
+                    current = n;
+                }
+                current.put(last, List.of(value));
+            }
+        } catch (XPathExpressionException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return defaults;
+    }
+
+    public static Map<String, Object> applyDefaults(Map<String, Object> map) {
+        Map<String, Object> defaults = getDefaultValues();
+        deepMerge(defaults, map);
+        return defaults;
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static void deepMerge(Map<String, Object> map1, Map<String, Object> map2) {
+        for (String key : map2.keySet()) {
+            Object value2 = map2.get(key);
+            if (map1.containsKey(key)) {
+                Object value1 = map1.get(key);
+                if (value1 instanceof Map && value2 instanceof Map) {
+                    deepMerge((Map<String, Object>) value1, (Map<String, Object>) value2);
+                } else if (value1 instanceof List && value2 instanceof List) {
+                    map1.put(key, merge((List) value1, (List) value2));
+                } else {
+                    map1.put(key, value2);
+                }
+            } else {
+                map1.put(key, value2);
+            }
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static List merge(List list1, List list2) {
+        list2.removeAll(list1);
+        list1.addAll(list2);
+        return list1;
     }
 
 }

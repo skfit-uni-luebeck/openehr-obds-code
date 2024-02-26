@@ -29,7 +29,7 @@ import org.xml.sax.SAXException;
 public class EHRParser {
     public String build(Map<String, Object> map)
             throws ParserConfigurationException, SAXException, XPathExpressionException, IOException {
-        String file = "oBDS_Tod.opt";
+        String file = "oBDS_Tumorkonferenz.opt";
         String path = "/template/definition[rm_type_name = \"COMPOSITION\"]/attributes[rm_attribute_name=\"content\"]";
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
@@ -43,14 +43,17 @@ public class EHRParser {
         Document doc = builder.parse(new File(file));
 
         composition.setArchetypeNodeId(
-                ((String) xp.evaluate("/template/definition/archetype_id", doc, XPathConstants.STRING)).trim());
+                ((String) xp.evaluate("/template/definition/archetype_id", doc, XPathConstants.STRING))
+                        .trim());
 
         composition.setNameAsString(
-                ((String) xp.evaluate("/template/definition/template_id", doc, XPathConstants.STRING)).trim());
+                ((String) xp.evaluate("/template/definition/template_id", doc, XPathConstants.STRING))
+                        .trim());
 
         Archetyped archetypeDetails = new Archetyped();
         archetypeDetails.setArchetypeId(new ArchetypeID(
-                ((String) xp.evaluate("/template/definition/archetype_id", doc, XPathConstants.STRING)).trim()));
+                ((String) xp.evaluate("/template/definition/archetype_id", doc, XPathConstants.STRING))
+                        .trim()));
 
         TemplateId templateId = new TemplateId();
         templateId.setValue(((String) xp.evaluate("/template/template_id", doc, XPathConstants.STRING)).trim());
@@ -72,9 +75,10 @@ public class EHRParser {
 
         Generator g = new Generator(doc);
         ArrayList<ContentItem> content = new ArrayList<ContentItem>();
+        Map<String, Object> applyMap = Generator.applyDefaults(map);
         composition.setContent(content);
 
-        Generator.processAttributeChildren(path, "", content, map);
+        Generator.processAttributeChildren(path, "", content, applyMap);
 
         System.out.println("Finished JSON-Generation. Generating String.");
 
@@ -82,4 +86,5 @@ public class EHRParser {
         return ehr;
 
     }
+
 }

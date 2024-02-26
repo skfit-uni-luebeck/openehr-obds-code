@@ -76,7 +76,7 @@ public final class OpenEhrObds {
 
         // ToDo: Replace with Kafka consumer
 
-        File f = new File("tod.xml");
+        File f = new File("tuko.xml");
 
         Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
@@ -97,6 +97,7 @@ public final class OpenEhrObds {
             Mapping m = Settings.getMapping().get(path);
 
             Map<String, Object> mapped = convertMdr(xmlSet, m);
+            listConv(mapped);
             mapped.entrySet().forEach(e -> queryFhirTs(m, e));
             Map<String, Object> result = formatMap((Map<String, Object>) mapped);
 
@@ -149,27 +150,45 @@ public final class OpenEhrObds {
 
     }
 
-    @SuppressWarnings("unchecked")
+    private static void listConv(Map<String, Object> input) {
+        input.entrySet().forEach(e -> {
+            switch (e.getValue()) {
+                case List l -> {
+                }
+                default -> {
+                    e.setValue(List.of(e.getValue()));
+                }
+            }
+        });
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private static void queryFhirTs(Mapping m, Map.Entry<String, Object> e) {
         MappingAttributes fa = FHIR_ATTRIBUTES.get(m.getTarget()).get(e.getKey());
-        if (fa != null && fa.getSystem() != null) {
-            String code = switch (e.getValue()) {
-                case String c -> c;
-                case Map map -> ((Map<String, String>) map).get("code");
-                default -> null;
-            };
-            if (fa.getConceptMap() == null) {
-                String version = switch (e.getValue()) {
-                    case String c -> fa.getVersion();
-                    case Map map -> ((Map<String, String>) map).get("version");
+        List<Object> listed = new ArrayList<>();
+        for (Object o : (List) e.getValue()) {
+            if (fa != null && fa.getSystem() != null) {
+                String code = switch (o) {
+                    case String c -> c;
+                    case Map map -> ((Map<String, String>) map).get("code");
                     default -> null;
                 };
-                e.setValue(FhirResolver.lookUp(fa.getSystem(), version, code));
-            } else if (fa.getConceptMap() != null) {
-                e.setValue(FhirResolver.conceptMap(fa.getConceptMap(), fa.getId(), fa.getSource(),
-                        fa.getTarget(), code));
+                if (fa.getConceptMap() == null) {
+                    String version = switch (o) {
+                        case String c -> fa.getVersion();
+                        case Map map -> ((Map<String, String>) map).get("version");
+                        default -> null;
+                    };
+                    listed.add(FhirResolver.lookUp(fa.getSystem(), version, code));
+                } else if (fa.getConceptMap() != null) {
+                    listed.add(FhirResolver.conceptMap(fa.getConceptMap(), fa.getId(), fa.getSource(),
+                            fa.getTarget(), code));
+                }
+            } else {
+                listed.add(o);
             }
         }
+        e.setValue(listed);
     }
 
     private static Map<String, Object> formatMap(Map<String, Object> input) {
