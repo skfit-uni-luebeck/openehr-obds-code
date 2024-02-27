@@ -76,11 +76,9 @@ public class Generator {
         }
         NodeList children = CACHE_NODE_LIST.get(newPath + "/rm_type_name");
         for (int i = 0; i < children.getLength(); i++) {
-            if (children.item(i) == null) {
+            if (children.item(i) == null || children.item(i).getFirstChild() == null || map == null) {
                 System.out.print("null");
-            }
-            if (children.item(i).getFirstChild() == null) {
-                continue;
+                return;
             }
             String type = "gen_" + children.item(i).getFirstChild().getTextContent();
             type = type.replaceAll("[^A-Za-z_]+", "_");
@@ -195,7 +193,7 @@ public class Generator {
         String oapActivities = path + "/attributes[rm_attribute_name=\"activities\"]";
         String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
         Boolean oaActivities = (Boolean) XP.evaluate(oapActivities, opt, XPathConstants.BOOLEAN);
-        Boolean oaProtocol = (Boolean) XP.evaluate(oapActivities, opt, XPathConstants.BOOLEAN);
+        Boolean oaProtocol = (Boolean) XP.evaluate(oapProtocol, opt, XPathConstants.BOOLEAN);
 
         Instruction instruction = new Instruction();
         instruction.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
@@ -245,8 +243,10 @@ public class Generator {
     public static void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String paramName = getArcheTypeId(path);
-        String oap = path + "/attributes[rm_attribute_name=\"description\"]";
-        Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+        String oapDescription = path + "/attributes[rm_attribute_name=\"description\"]";
+        String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
+        Boolean oaDescription = (Boolean) XP.evaluate(oapDescription, opt, XPathConstants.BOOLEAN);
+        Boolean oaProtocol = (Boolean) XP.evaluate(oapProtocol, opt, XPathConstants.BOOLEAN);
 
         Action action = new Action();
         action.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
@@ -255,17 +255,21 @@ public class Generator {
         action.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
         action.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
         action.setSubject(new PartySelf());
+        IsmTransition ism = new IsmTransition();
+        ism.setCurrentState(
+                new DvCodedText("completed", new CodePhrase(new TerminologyId("openehr"), "532", "completed")));
+        action.setIsmTransition(ism);
 
         if (map.containsKey(paramName)) {
             action.setTime(new DvDateTime(((Map<String, List<String>>) map.get(paramName)).get("time").get(0)));
-            ItemTree itemTree = new ItemTree();
-            processAttributeChildren(oap, paramName, itemTree, (Map<String, Object>) map.get(paramName));
-            action.setDescription(itemTree);
-            IsmTransition ism = new IsmTransition();
-            ism.setCurrentState(
-                    new DvCodedText("completed", new CodePhrase(new TerminologyId("openehr"), "532", "completed")));
-            action.setIsmTransition(ism);
-            if (oa) {
+            ItemTree description = new ItemTree();
+            ItemTree protocol = new ItemTree();
+            processAttributeChildren(oapDescription, paramName, description, (Map<String, Object>) map.get(paramName));
+            processAttributeChildren(oapProtocol, paramName, protocol, (Map<String, Object>) map.get(paramName));
+            action.setDescription(description);
+            action.setProtocol(protocol);
+
+            if (oaDescription || oaProtocol) {
                 ((ArrayList<ContentItem>) jsonmap).add(action);
             }
         }
@@ -343,12 +347,15 @@ public class Generator {
         }
         String label = getLabel(nodeId, name);
 
-        ((List) map.get(nodeId)).forEach(e -> {
+        ((List<Object>) map.get(nodeId)).forEach(e -> {
             Element el = new Element();
             el.setArchetypeNodeId(nodeId);
             el.setNameAsString(label);
             Map<String, Object> mo = new HashMap<>();
             mo.put(nodeId, e);
+            if (e instanceof Map || e instanceof List) {
+                return;
+            }
             processAttributeChildren(newPath, nodeId, el, mo);
             ((ArrayList<Element>) jsonmap).add(el);
 
@@ -629,7 +636,7 @@ public class Generator {
         }
     }
 
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private static List merge(List list1, List list2) {
         list2.removeAll(list1);
         list1.addAll(list2);
