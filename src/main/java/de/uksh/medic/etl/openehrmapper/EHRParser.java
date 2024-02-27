@@ -6,6 +6,7 @@ import com.nedap.archie.rm.archetyped.TemplateId;
 import com.nedap.archie.rm.composition.Composition;
 import com.nedap.archie.rm.composition.ContentItem;
 import com.nedap.archie.rm.composition.EventContext;
+import com.nedap.archie.rm.datastructures.ItemTree;
 import com.nedap.archie.rm.datatypes.CodePhrase;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
@@ -29,8 +30,11 @@ import org.xml.sax.SAXException;
 public class EHRParser {
     public String build(Map<String, Object> map)
             throws ParserConfigurationException, SAXException, XPathExpressionException, IOException {
-        String file = "oBDS_Tumorkonferenz.opt";
-        String path = "/template/definition[rm_type_name = \"COMPOSITION\"]/attributes[rm_attribute_name=\"content\"]";
+        String file = "oBDS_ST.opt";
+        String pathContent = "/template/definition[rm_type_name = \"COMPOSITION\"]"
+                + "/attributes[rm_attribute_name=\"content\"]";
+        String pathContext = "/template/definition[rm_type_name = \"COMPOSITION\"]"
+                + "/attributes[rm_attribute_name=\"context\"]/children/attributes[rm_attribute_name=\"other_context\"]";
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
         XPathFactory xpf = XPathFactory.newInstance();
@@ -69,15 +73,20 @@ public class EHRParser {
 
         composition.setComposer(new PartySelf());
         map.put("start_time", "20191122T101638,642+0000"); // need to fix
-        composition.setContext(new EventContext(new DvDateTime((String) map.get("start_time")),
-                new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238"))));
 
         Generator g = new Generator(doc);
-        ArrayList<ContentItem> content = new ArrayList<ContentItem>();
         Map<String, Object> applyMap = Generator.applyDefaults(map);
-        composition.setContent(content);
 
-        Generator.processAttributeChildren(path, "", content, applyMap);
+        ArrayList<ContentItem> content = new ArrayList<ContentItem>();
+        composition.setContent(content);
+        Generator.processAttributeChildren(pathContent, "", content, applyMap);
+
+        EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
+                new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
+        composition.setContext(context);
+        ItemTree itemTree = new ItemTree();
+        context.setOtherContext(itemTree);
+        Generator.processAttributeChildren(pathContext, "", itemTree, applyMap);
 
         System.out.println("Finished JSON-Generation. Generating String.");
 
