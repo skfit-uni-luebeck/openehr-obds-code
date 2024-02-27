@@ -7,6 +7,7 @@ import com.nedap.archie.rm.composition.AdminEntry;
 import com.nedap.archie.rm.composition.ContentItem;
 import com.nedap.archie.rm.composition.Evaluation;
 import com.nedap.archie.rm.composition.Instruction;
+import com.nedap.archie.rm.composition.IsmTransition;
 import com.nedap.archie.rm.composition.Observation;
 import com.nedap.archie.rm.composition.Section;
 import com.nedap.archie.rm.datastructures.Cluster;
@@ -63,7 +64,7 @@ public class Generator {
     public static void processAttributeChildren(String path, String name, Object jsonmap,
             Map<String, Object> map) {
         String newPath = path + "/children";
-        if (!CACHE_NODE_LIST.containsKey(path + "/rm_type_name")) {
+        if (!CACHE_NODE_LIST.containsKey(newPath + "/rm_type_name")) {
             XPathExpression expr;
             try {
                 expr = XP.compile(newPath + "/rm_type_name");
@@ -98,22 +99,21 @@ public class Generator {
     // Navigation Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/ehr.html#_class_descriptions_4
 
+    @SuppressWarnings("unchecked")
     public static void gen_SECTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
-        String nodeId = getNodeId(path);
-        String label = getTypeLabel(path, nodeId);
-        // String newPath = path + "/attributes";
+        String paramName = getArcheTypeId(path);
+        String label = getTypeLabel(path, getNodeId(path));
+        String newPath = path + "/attributes";
         Section section = new Section();
-        section.setArchetypeNodeId(nodeId);
+        section.setArchetypeNodeId(paramName);
 
         section.setNameAsString(label);
+        List<ContentItem> items = new ArrayList<>();
+        processAttributeChildren(newPath, paramName, items, (Map<String, Object>) map.get(paramName));
+        section.setItems(items);
 
-        // events.setTime(new DvDateTime((String) map.get("events_time")));
-        // ItemTree itemTree = new ItemTree();
-        // processAttributeChildren(path, nodeId, itemTree, map);
-        // section.setItems(itemTree);
-
-        // ((History<ItemStructure>) jsonmap).addEvent(events);
+        ((List<ContentItem>) jsonmap).add(section);
     }
 
     // Entry Class descriptions
@@ -224,11 +224,11 @@ public class Generator {
         Activity activity = new Activity();
         activity.setActionArchetypeId("openEHR-EHR-INSTRUCTION.service_request.v1");
         activity.setArchetypeNodeId(nodeId);
-        activity.setNameAsString(getLabel(getNodeId(path), nodeId));
+        activity.setNameAsString(getLabel(nodeId, name));
 
         if (map.containsKey(nodeId)) {
             ItemTree itemTree = new ItemTree();
-            processAttributeChildren(oap, nodeId, itemTree, (Map<String, Object>) map.get(nodeId));
+            processAttributeChildren(oap, name, itemTree, (Map<String, Object>) map.get(nodeId));
             activity.setDescription(itemTree);
             if (oa) {
                 ((ArrayList<Activity>) jsonmap).add(activity);
@@ -236,22 +236,34 @@ public class Generator {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public static void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
-        String nodeId = getNodeId(path);
-        String label = getTypeLabel(path, nodeId);
-        // String newPath = path + "/attributes";
+        String paramName = getArcheTypeId(path);
+        String oap = path + "/attributes[rm_attribute_name=\"description\"]";
+        Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+
         Action action = new Action();
-        action.setArchetypeNodeId(nodeId);
+        action.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+        action.setArchetypeNodeId(paramName);
+        action.setNameAsString(getLabel(getNodeId(path), paramName));
+        action.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+        action.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+        action.setSubject(new PartySelf());
 
-        action.setNameAsString(label);
-
-        // events.setTime(new DvDateTime((String) map.get("events_time")));
-        // ItemTree itemTree = new ItemTree();
-        // processAttributeChildren(path, nodeId, itemTree, map);
-        // section.setItems(itemTree);
-
-        // ((History<ItemStructure>) jsonmap).addEvent(events);
+        if (map.containsKey(paramName)) {
+            action.setTime(new DvDateTime(((Map<String, List<String>>) map.get(paramName)).get("time").get(0)));
+            ItemTree itemTree = new ItemTree();
+            processAttributeChildren(oap, paramName, itemTree, (Map<String, Object>) map.get(paramName));
+            action.setDescription(itemTree);
+            IsmTransition ism = new IsmTransition();
+            ism.setCurrentState(
+                    new DvCodedText("completed", new CodePhrase(new TerminologyId("openehr"), "532", "completed")));
+            action.setIsmTransition(ism);
+            if (oa) {
+                ((ArrayList<ContentItem>) jsonmap).add(action);
+            }
+        }
     }
 
     // INSTRUCTION_DETAILS
@@ -274,7 +286,6 @@ public class Generator {
             CACHE.put(path + "/../rm_attribute_name", (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         String attributeName = CACHE.get(path + "/../rm_attribute_name");
-        String archeTypeId = getArcheTypeId(path + "/../../../../../..");
         String nodeId = getNodeId(path);
         String newPath = path + "/attributes";
         if ("".equals(attributeName)) {
@@ -286,7 +297,7 @@ public class Generator {
         itemTree.setNameAsString("data"); // fix name
         ArrayList<Item> items = new ArrayList<Item>();
         itemTree.setItems(items);
-        processAttributeChildren(newPath, archeTypeId, items, map);
+        processAttributeChildren(newPath, name, items, map);
     }
 
     // Representation Class descriptions
@@ -316,7 +327,7 @@ public class Generator {
         cluster.setArchetypeNodeId(aNodeId);
         cluster.setNameAsString(label);
         ArrayList<Item> items = new ArrayList<Item>();
-        Generator.processAttributeChildren(newPath, paramName, items, (Map<String, Object>) map.get(code));
+        processAttributeChildren(newPath, paramName, items, (Map<String, Object>) map.get(code));
         cluster.setItems(items);
         ((ArrayList<Object>) jsonmap).add(cluster);
     }
@@ -513,8 +524,8 @@ public class Generator {
     // XPath Query functions
 
     private static String getLabel(String code, String archetype) throws Exception {
-        String path = "/template/definition/attributes[rm_attribute_name=\"content\"]//children[archetype_id/value=\""
-                + archetype + "\"]/term_definitions[@code=\"" + code + "\"]/items[@id=\"text\"]";
+        String path = "//archetype_id[value=\"" + archetype + "\"]/../term_definitions[@code=\"" + code
+                + "\"]/items[@id=\"text\"]/text()";
         if (!CACHE.containsKey(path)) {
             XPathExpression expr = XP.compile(path);
             CACHE.put(path, (String) expr.evaluate(opt, XPathConstants.STRING));
