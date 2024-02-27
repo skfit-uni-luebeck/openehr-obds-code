@@ -26,6 +26,7 @@ import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.DvURI;
 import com.nedap.archie.rm.datavalues.quantity.DvCount;
 import com.nedap.archie.rm.datavalues.quantity.DvOrdinal;
+import com.nedap.archie.rm.datavalues.quantity.datetime.DvDate;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
@@ -428,6 +429,9 @@ public class Generator {
     public static void gen_DV_TEXT(String path, String name, Object jsonmap,
             Map<String, String> map)
             throws Exception {
+        if (!map.containsKey(name)) {
+            return;
+        }
         ((Element) jsonmap).setValue(new DvText(map.get(name)));
     }
 
@@ -504,7 +508,10 @@ public class Generator {
     // DateTime Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_4
 
-    // DV_DATE
+    public static void gen_DV_DATE(String path, String name, Object jsonmap,
+            Map<String, String> map) {
+        ((Element) jsonmap).setValue(new DvDate(map.get(name)));
+    }
 
     // DV_TIME
 
