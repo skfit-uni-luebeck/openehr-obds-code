@@ -11,7 +11,6 @@ public class MappingAttributes {
     private String id;
     private String code;
     private String version;
-    private String path;
 
     public MappingAttributes() {
     }
