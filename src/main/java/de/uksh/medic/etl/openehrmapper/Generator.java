@@ -25,6 +25,7 @@ import com.nedap.archie.rm.datavalues.DvIdentifier;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.DvURI;
 import com.nedap.archie.rm.datavalues.quantity.DvCount;
+import com.nedap.archie.rm.datavalues.quantity.DvOrdinal;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
@@ -353,6 +354,7 @@ public class Generator {
             el.setNameAsString(label);
             Map<String, Object> mo = new HashMap<>();
             mo.put(nodeId, e);
+            mo.put("name", name);
             if (e instanceof Map || e instanceof List) {
                 return;
             }
@@ -469,8 +471,17 @@ public class Generator {
 
     // REFERENCE_RANGE
 
-    // DV_ORDINAL
-
+    public static void gen_DV_ORDINAL(String path, String name, Object jsonmap,
+            Map<String, String> map) throws Exception {
+        DvOrdinal dvo = new DvOrdinal();
+        Long value = Long.valueOf(map.get(name));
+        dvo.setValue(value);
+        String ordinal = getOrdinal(path, map.get(name));
+        String display = getLabel(ordinal, map.get("name"));
+        DvCodedText ct = new DvCodedText(display, new CodePhrase(new TerminologyId("local_terms"), ordinal, display));
+        dvo.setSymbol(ct);
+        ((Element) jsonmap).setValue(dvo);
+    }
     // DV_SCALE
 
     // DV_QUANTIFIED
@@ -530,6 +541,15 @@ public class Generator {
     // DV_EHR_URI
 
     // XPath Query functions
+
+    private static String getOrdinal(String path, String code) throws Exception {
+        String newPath = path + "/list[value/text()=\"" + code + "\"]/symbol/defining_code/code_string/text()";
+        if (!CACHE.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        return CACHE.get(newPath);
+    }
 
     private static String getLabel(String code, String archetype) throws Exception {
         String path = "//archetype_id[value=\"" + archetype + "\"]/../term_definitions[@code=\"" + code
