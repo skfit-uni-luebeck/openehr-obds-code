@@ -192,8 +192,10 @@ public class Generator {
     public static void gen_INSTRUCTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String paramName = getArcheTypeId(path);
-        String oap = path + "/attributes[rm_attribute_name=\"activities\"]";
-        Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+        String oapActivities = path + "/attributes[rm_attribute_name=\"activities\"]";
+        String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
+        Boolean oaActivities = (Boolean) XP.evaluate(oapActivities, opt, XPathConstants.BOOLEAN);
+        Boolean oaProtocol = (Boolean) XP.evaluate(oapActivities, opt, XPathConstants.BOOLEAN);
 
         Instruction instruction = new Instruction();
         instruction.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
@@ -202,13 +204,16 @@ public class Generator {
         instruction.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
         instruction.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
         instruction.setSubject(new PartySelf());
-        instruction.setNarrative(new DvText("asdf"));
+        instruction.setNarrative(new DvText(""));
 
         if (map.containsKey(paramName)) {
             List<Activity> activities = new ArrayList<>();
-            processAttributeChildren(oap, paramName, activities, (Map<String, Object>) map.get(paramName));
+            ItemTree protocol = new ItemTree();
+            processAttributeChildren(oapActivities, paramName, activities, (Map<String, Object>) map.get(paramName));
+            processAttributeChildren(oapProtocol, paramName, protocol, (Map<String, Object>) map.get(paramName));
             instruction.setActivities(activities);
-            if (oa) {
+            instruction.setProtocol(protocol);
+            if (oaActivities || oaProtocol) {
                 ((ArrayList<ContentItem>) jsonmap).add(instruction);
             }
         }
@@ -265,10 +270,6 @@ public class Generator {
             }
         }
     }
-
-    // INSTRUCTION_DETAILS
-
-    // ISM_TRANSITION
 
     // Item Structure
     // https://specifications.openehr.org/releases/RM/latest/data_structures.html#_class_descriptions_2
