@@ -9,7 +9,7 @@ import com.nedap.archie.rm.composition.EventContext;
 import com.nedap.archie.rm.datatypes.CodePhrase;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
-import com.nedap.archie.rm.generic.PartyIdentified;
+import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
 import java.io.File;
@@ -67,8 +67,7 @@ public class EHRParser {
 
         composition.setCategory(new DvCodedText("event", new CodePhrase(new TerminologyId("openehr"), "433")));
 
-        PartyIdentified composer = new PartyIdentified(null, "MyDoctor", null);
-        composition.setComposer(composer);
+        composition.setComposer(new PartySelf());
         map.put("start_time", "20191122T101638,642+0000"); // need to fix
         composition.setContext(new EventContext(new DvDateTime((String) map.get("start_time")),
                 new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238"))));
