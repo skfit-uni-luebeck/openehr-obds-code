@@ -76,7 +76,7 @@ public final class OpenEhrObds {
 
         // ToDo: Replace with Kafka consumer
 
-        File f = new File("tuko.xml");
+        File f = new File("st.xml");
 
         Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
@@ -152,6 +152,9 @@ public final class OpenEhrObds {
 
     private static void listConv(Map<String, Object> input) {
         input.entrySet().forEach(e -> {
+            if (e.getValue() == null) {
+                return;
+            }
             switch (e.getValue()) {
                 case List l -> {
                 }
@@ -164,6 +167,9 @@ public final class OpenEhrObds {
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static void queryFhirTs(Mapping m, Map.Entry<String, Object> e) {
+        if (e.getValue() == null) {
+            return;
+        }
         MappingAttributes fa = FHIR_ATTRIBUTES.get(m.getTarget()).get(e.getKey());
         List<Object> listed = new ArrayList<>();
         for (Object o : (List) e.getValue()) {
