@@ -26,6 +26,7 @@ import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.DvURI;
 import com.nedap.archie.rm.datavalues.quantity.DvCount;
 import com.nedap.archie.rm.datavalues.quantity.DvOrdinal;
+import com.nedap.archie.rm.datavalues.quantity.DvQuantity;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDate;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
 import com.nedap.archie.rm.generic.PartySelf;
@@ -329,7 +330,7 @@ public class Generator {
         if (!map.containsKey(code)) {
             return;
         }
-        String label = getLabel(nodeId, aNodeId);
+        String label = getLabel(nodeId, paramName);
         Cluster cluster = new Cluster();
         cluster.setArchetypeNodeId(aNodeId);
         cluster.setNameAsString(label);
@@ -453,11 +454,23 @@ public class Generator {
                 ((Element) jsonmap).setValue(ct);
             }
             case String s -> {
-                String display = getLocalTerminologyTerm(path, s);
-                ct.setDefiningCode(new CodePhrase(
-                        new TerminologyId("local_terms"),
-                        s, display));
-                ct.setValue(display);
+                String display = getLocalTerminologyTerm((String) map.get("name"), s);
+                switch (display) {
+                    case "" -> {
+                        String local = getLocalTerm(path, s);
+                        ct.setDefiningCode(new CodePhrase(
+                                new TerminologyId("local"),
+                                local, s));
+                        ct.setValue(s);
+                    }
+                    default -> {
+                        ct.setDefiningCode(new CodePhrase(
+                                new TerminologyId("local_terms"),
+                                s, display));
+                        ct.setValue(display);
+                    }
+                }
+
                 ((Element) jsonmap).setValue(ct);
             }
             default -> {
@@ -492,7 +505,10 @@ public class Generator {
 
     // DV_AMOUNT
 
-    // DV_QUANTITY
+    public static void gen_DV_QUANTITY(String path, String name, Object jsonmap,
+            Map<String, String> map) {
+        ((Element) jsonmap).setValue(new DvQuantity("1", Double.valueOf(map.get(name)), 1L));
+    }
 
     public static void gen_DV_COUNT(String path, String name, Object jsonmap,
             Map<String, Long> map) {
@@ -577,8 +593,19 @@ public class Generator {
         return CACHE.get(newPath);
     }
 
-    private static String getLocalTerminologyTerm(String path, String code) throws Exception {
-        String newPath = "//term_definitions[@code=\"local_terms::" + code + "\"]/items/text()";
+    private static String getLocalTerminologyTerm(String archetype, String code) throws Exception {
+        String newPath = "//archetype_id[value/text()=\"" + archetype + "\"]/../term_definitions[@code=\"local_terms::"
+                + code + "\"]/items/text()";
+        if (!CACHE.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            CACHE.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
+                    .replaceAll("\\n", " "));
+        }
+        return CACHE.get(newPath);
+    }
+
+    private static String getLocalTerm(String path, String code) throws Exception {
+        String newPath = "//term_definitions[items/@id=\"text\"][items/text()=\"" + code + "\"]/@code";
         if (!CACHE.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
             CACHE.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
@@ -618,18 +645,20 @@ public class Generator {
                 String value = (String) exprC.evaluate(opt, XPathConstants.STRING);
                 String differentialPath = ((String) exprP.evaluate(opt, XPathConstants.STRING)).trim();
                 List<String> l = List.of(differentialPath.split("/"));
-                String last = l.getLast().split("(\\[|\\])")[1];
+                String last = l.getLast().split("(\\[|\\])")[1].replaceAll(",.*", "");
                 for (int j = 1; j < l.size() - 1; j++) {
                     String s = l.get(j);
                     if (s.contains("description")) {
                         continue;
                     }
                     Map<String, Object> n = new HashMap<>();
-                    String s2 = s.split("(\\[|\\])")[1];
+                    String s2 = s.split("(\\[|\\])")[1].replaceAll(",.*", "");
                     current.put(s2, n);
                     current = n;
                 }
-                current.put(last, List.of(value));
+                List<String> ls = new ArrayList<>();
+                ls.add(value);
+                current.put(last, ls);
             }
         } catch (XPathExpressionException e) {
             // TODO Auto-generated catch block
