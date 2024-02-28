@@ -97,6 +97,7 @@ public final class OpenEhrObds {
             Mapping m = Settings.getMapping().get(path);
 
             Map<String, Object> mapped = convertMdr(xmlSet, m);
+            mapped.values().removeIf(Objects::isNull);
             listConv(mapped);
             mapped.entrySet().forEach(e -> queryFhirTs(m, e));
             Map<String, Object> result = formatMap((Map<String, Object>) mapped);
@@ -159,7 +160,9 @@ public final class OpenEhrObds {
                 case List l -> {
                 }
                 default -> {
-                    e.setValue(List.of(e.getValue()));
+                    List<Object> l = new ArrayList<>();
+                    l.add(e.getValue());
+                    e.setValue(l);
                 }
             }
         });
