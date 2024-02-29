@@ -345,10 +345,20 @@ public class Generator {
             throws Exception {
         String nodeId = getNodeId(path);
         String newPath = path + "/attributes[rm_attribute_name = \"value\"]";
+        String label = getLabel(nodeId, name);
+
         if (!map.containsKey(nodeId)) {
+            if (isMandatory(path)) {
+                Element el = new Element();
+                el.setArchetypeNodeId(nodeId);
+                el.setNameAsString(label);
+                el.setNullFlavour(new DvCodedText("not applicable",
+                        new CodePhrase(new TerminologyId("openehr"), "273", "not applicable")));
+                ((ArrayList<Element>) jsonmap).add(el);
+
+            }
             return;
         }
-        String label = getLabel(nodeId, name);
 
         ((List<Object>) map.get(nodeId)).forEach(e -> {
             Element el = new Element();
@@ -480,18 +490,18 @@ public class Generator {
     }
 
     // public static void gen_DV_PARAGRAPH(String path, String name, Object jsonmap,
-    //         Map<String, List<String>> map)
-    //         throws Exception {
-    //     if (!map.containsKey(name)) {
-    //         return;
-    //     }
-    //     List<DvText> dts = new ArrayList<>();
-    //     for(String s : map.get(name)) {
-    //         dts.add(new DvText(s));
-    //     }
-    //     DvParagraph dp = new DvParagraph();
-    //     dp.setItems(dts);
-    //     ((Element) jsonmap).setValue(dp);
+    // Map<String, List<String>> map)
+    // throws Exception {
+    // if (!map.containsKey(name)) {
+    // return;
+    // }
+    // List<DvText> dts = new ArrayList<>();
+    // for(String s : map.get(name)) {
+    // dts.add(new DvText(s));
+    // }
+    // DvParagraph dp = new DvParagraph();
+    // dp.setItems(dts);
+    // ((Element) jsonmap).setValue(dp);
     // }
 
     // Quantity Class descriptions
@@ -578,6 +588,15 @@ public class Generator {
 
     // XPath Query functions
 
+    private static Boolean isMandatory(String path) throws Exception {
+        String newPath = path + "/occurrences/lower/text()";
+        if (!CACHE.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        return "1".equals(CACHE.get(newPath));
+    }
+
     private static String getOrdinal(String path, String code) throws Exception {
         String newPath = path + "/list[value/text()=\"" + code + "\"]/symbol/defining_code/code_string/text()";
         if (!CACHE.containsKey(newPath)) {
@@ -661,7 +680,7 @@ public class Generator {
                 String last = l.getLast().split("(\\[|\\])")[1].replaceAll(",.*", "");
                 for (int j = 1; j < l.size() - 1; j++) {
                     String s = l.get(j);
-                    if (s.contains("description")) {
+                    if (s.contains("description[at") || s.contains("data[at")) {
                         continue;
                     }
                     Map<String, Object> n = new HashMap<>();
