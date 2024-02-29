@@ -26,6 +26,7 @@ import java.net.URISyntaxException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
+import javax.xml.bind.JAXBException;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
 import org.tinylog.Logger;
@@ -34,6 +35,7 @@ import org.xml.sax.SAXException;
 public final class OpenEhrObds {
 
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
+    private static Integer i = 0;
 
     private OpenEhrObds() {
     }
@@ -92,6 +94,12 @@ public final class OpenEhrObds {
         if (depth > Settings.getDepthLimit()) {
             return;
         }
+
+        Boolean split = Settings.getMapping().containsKey(path)
+                && Settings.getMapping().get(path).getSplit();
+
+        Map<String, Object> theMap = resMap;
+
         if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSource() != null) {
 
             Mapping m = Settings.getMapping().get(path);
@@ -102,52 +110,33 @@ public final class OpenEhrObds {
             mapped.entrySet().forEach(e -> queryFhirTs(m, e));
             Map<String, Object> result = formatMap((Map<String, Object>) mapped);
 
-            buildOpenEhrComposition(result);
+            result.putAll(resMap);
+            theMap = result;
 
-            resMap.putAll(result);
+            if (split) {
+                buildOpenEhrComposition(result);
+            }
 
         }
 
-        xmlSet.forEach(entry -> {
+        for (Map.Entry<String, Object> entry : xmlSet) {
             String newPath = path + "/" + entry.getKey();
             int newDepth = depth + 1;
 
             switch (entry.getValue()) {
                 case @SuppressWarnings("rawtypes") Map h -> {
-                    if (Settings.getMapping().containsKey(newPath)
-                            && Settings.getMapping().get(newPath).getSplit()) {
-                        Map<String, Object> m = new LinkedHashMap<>();
-                        System.out.println(entry.getKey());
-                        walkXmlTree(h.entrySet(), newDepth, newPath, m);
-                        resMap.put(newPath, List.of(m));
-                    } else {
-                        walkXmlTree(h.entrySet(), newDepth, newPath, resMap);
-                    }
+                    walkXmlTree(h.entrySet(), newDepth, newPath, theMap);
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
-
-                    if (Settings.getMapping().containsKey(newPath)
-                            && Settings.getMapping().get(newPath).getSplit()) {
-                        List<Map<String, Object>> l = new ArrayList<>();
-                        a.forEach(b -> {
-                            Map<String, Object> m = new LinkedHashMap<>();
-                            l.add(m);
-                            System.out.println(entry.getKey());
-                            walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, m);
-                        });
-                        resMap.put(newPath, l);
-                    } else {
-                        a.forEach(b -> {
-                            System.out.println(entry.getKey());
-                            walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, resMap);
-                        });
+                    for (Object b : a) {
+                        System.out.println(entry.getKey());
+                        walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
                     }
                 }
-
                 default -> {
                 }
             }
-        });
+        }
 
     }
 
@@ -157,7 +146,7 @@ public final class OpenEhrObds {
                 return;
             }
             switch (e.getValue()) {
-                case List l -> {
+                case @SuppressWarnings("rawtypes") List l -> {
                 }
                 default -> {
                     List<Object> l = new ArrayList<>();
@@ -240,11 +229,14 @@ public final class OpenEhrObds {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     private static void buildOpenEhrComposition(Map<String, Object> data) {
         EHRParser ep = new EHRParser();
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter("output.json"))) {
+        try (BufferedWriter writer = new BufferedWriter(
+                new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).get(0) + ".json"))) {
             writer.write(ep.build(data));
-        } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException e) {
+        } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException
+                | JAXBException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
