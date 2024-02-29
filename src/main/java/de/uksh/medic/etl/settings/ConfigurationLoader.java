@@ -29,6 +29,7 @@ public class ConfigurationLoader {
      * @param cls Class of POJO representing the yaml file.
      * @return Initialized object of POJO with values from yml and environment
      */
+    @SuppressWarnings("null")
     public <T> T loadConfiguration(InputStream config, Class<T> cls) {
         try {
             String contents = this.stringSubstitutor
