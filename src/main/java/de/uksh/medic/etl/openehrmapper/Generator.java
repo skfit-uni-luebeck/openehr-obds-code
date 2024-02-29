@@ -479,7 +479,20 @@ public class Generator {
 
     }
 
-    // DV_PARAGRAPH
+    // public static void gen_DV_PARAGRAPH(String path, String name, Object jsonmap,
+    //         Map<String, List<String>> map)
+    //         throws Exception {
+    //     if (!map.containsKey(name)) {
+    //         return;
+    //     }
+    //     List<DvText> dts = new ArrayList<>();
+    //     for(String s : map.get(name)) {
+    //         dts.add(new DvText(s));
+    //     }
+    //     DvParagraph dp = new DvParagraph();
+    //     dp.setItems(dts);
+    //     ((Element) jsonmap).setValue(dp);
+    // }
 
     // Quantity Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_3
