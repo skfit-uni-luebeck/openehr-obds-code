@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
+import javax.xml.bind.JAXBException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -29,7 +30,7 @@ import org.xml.sax.SAXException;
 
 public class EHRParser {
     public String build(Map<String, Object> map)
-            throws ParserConfigurationException, SAXException, XPathExpressionException, IOException {
+            throws ParserConfigurationException, SAXException, XPathExpressionException, IOException, JAXBException {
         String file = "oBDS_ST.opt";
         String pathContent = "/template/definition[rm_type_name = \"COMPOSITION\"]"
                 + "/attributes[rm_attribute_name=\"content\"]";
@@ -79,18 +80,24 @@ public class EHRParser {
 
         ArrayList<ContentItem> content = new ArrayList<ContentItem>();
         composition.setContent(content);
-        Generator.processAttributeChildren(pathContent, "", content, applyMap);
+        Generator.processAttributeChildren(pathContent, composition.getArchetypeNodeId(), content, applyMap);
 
         EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
                 new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
         composition.setContext(context);
         ItemTree itemTree = new ItemTree();
         context.setOtherContext(itemTree);
-        Generator.processAttributeChildren(pathContext, "", itemTree, applyMap);
+        Generator.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap);
 
         System.out.println("Finished JSON-Generation. Generating String.");
 
         String ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
+
+        // Marshaller marshaller = JAXBUtil.getArchieJAXBContext().createMarshaller();
+        // StringWriter writer = new StringWriter();
+        // marshaller.marshal(composition, writer);
+        // String ehr = writer.toString();
+
         return ehr;
 
     }
