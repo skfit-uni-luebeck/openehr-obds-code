@@ -166,27 +166,35 @@ public class Generator {
             processAttributeChildren(oap, paramName, history, (Map<String, Object>) map.get(paramName));
             observation.setData(history);
             if (oa) {
-                ((ArrayList<ContentItem>) jsonmap).add(observation);
+                ((List<ContentItem>) jsonmap).add(observation);
             }
         }
     }
 
+    @SuppressWarnings("unchecked")
     public static void gen_EVALUATION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
-        String nodeId = getNodeId(path);
-        String label = getTypeLabel(path, nodeId);
-        // String newPath = path + "/attributes";
-        Evaluation events = new Evaluation();
-        events.setArchetypeNodeId(nodeId);
+        String paramName = getArcheTypeId(path);
+        String oap = path + "/attributes[rm_attribute_name=\"data\"]";
+        Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
 
-        events.setNameAsString(label);
+        Evaluation evaluation = new Evaluation();
+        evaluation.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+        evaluation.setArchetypeNodeId(paramName);
+        evaluation.setNameAsString(getLabel(getNodeId(path), paramName));
+        evaluation.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+        evaluation.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+        evaluation.setSubject(new PartySelf());
 
-        // events.setTime(new DvDateTime((String) map.get("events_time")));
-        // ItemTree itemTree = new ItemTree();
-        // processAttributeChildren(path, nodeId, itemTree, map);
-        // events.setData(itemTree);
+        if (map.containsKey(paramName)) {
+            ItemTree data = new ItemTree();
+            processAttributeChildren(oap, paramName, data, (Map<String, Object>) map.get(paramName));
+            evaluation.setData(data);
+            if (oa) {
+                ((List<ContentItem>) jsonmap).add(evaluation);
+            }
+        }
 
-        // ((History<ItemStructure>) jsonmap).addEvent(events);
     }
 
     @SuppressWarnings("unchecked")
@@ -390,7 +398,7 @@ public class Generator {
 
         history.setNameAsString(label);
 
-        history.setOrigin(new DvDateTime((String) map.get("events_time")));
+        history.setOrigin(new DvDateTime((String) ((List<String>) map.get("events_time")).get(0)));
 
         processAttributeChildren(newPath, nodeId, history, map);
     }
@@ -406,7 +414,7 @@ public class Generator {
 
         events.setNameAsString(label);
 
-        events.setTime(new DvDateTime((String) map.get("events_time")));
+        events.setTime(new DvDateTime((String) ((List<String>) map.get("events_time")).get(0)));
         ItemTree itemTree = new ItemTree();
         processAttributeChildren(newPath, nodeId, itemTree, map);
         events.setData(itemTree);
