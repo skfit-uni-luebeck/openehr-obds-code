@@ -84,7 +84,7 @@ public class Generator {
                 return;
             }
             String type = "gen_" + children.item(i).getFirstChild().getTextContent();
-            type = type.replaceAll("[^A-Za-z_]+", "_");
+            type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "");
             Method met;
             try {
                 met = Generator.class.getMethod(type, String.class, String.class, Object.class,
