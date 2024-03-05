@@ -23,6 +23,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
@@ -78,7 +79,7 @@ public final class OpenEhrObds {
 
         // ToDo: Replace with Kafka consumer
 
-        File f = new File("st.xml");
+        File f = new File("op.xml");
 
         Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
@@ -233,8 +234,19 @@ public final class OpenEhrObds {
     private static void buildOpenEhrComposition(Map<String, Object> data) {
         EHRParser ep = new EHRParser();
         try (BufferedWriter writer = new BufferedWriter(
-                new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).get(0) + ".json"))) {
-            writer.write(ep.build(data));
+                new FileWriter(i + "_" + ((List<String>) data.get("ehr_id")).get(0) + ".json"))) {
+            String ehr = ep.build(data);
+            writer.write(ehr);
+            String content = Files.readString(new File("iti41.xml").toPath());
+            content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).get(0));
+            content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(ehr.getBytes())));
+            content = content.replace("UUID1", UUID.randomUUID().toString());
+            content = content.replace("UUID2", UUID.randomUUID().toString());
+            content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));
+            BufferedWriter writerXDS = new BufferedWriter(
+                    new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).get(0) + ".xml"));
+            writerXDS.write(content);
+            writerXDS.close();
         } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException
                 | JAXBException e) {
             // TODO Auto-generated catch block
