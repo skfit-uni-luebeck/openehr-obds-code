@@ -71,7 +71,7 @@
 						</rim:ExternalIdentifier>
 						<rim:Slot name="submissionTime">
 							<rim:ValueList>
-								<rim:Value>20231216014613</rim:Value>
+								<rim:Value>DATETIME</rim:Value>
 							</rim:ValueList>
 						</rim:Slot>
 						<rim:ExternalIdentifier
@@ -171,7 +171,7 @@
 							classifiedObject="urn:uuid:UUID2"
 							id="cl7"
 							objectType="urn:oasis:names:tc:ebxml-regrep:ObjectType:RegistryObject:Classification"
-							nodeRepresentation="raw">
+							nodeRepresentation="tdd">
 							<rim:Slot name="codingScheme">
 								<rim:ValueList>
 									<rim:Value>1.3.6.1.4.1.19376.1.2.3</rim:Value>
@@ -228,7 +228,7 @@
 						</rim:Classification>
 						<rim:Slot name="creationTime">
 							<rim:ValueList>
-								<rim:Value>20231216014613</rim:Value>
+								<rim:Value>DATETIME</rim:Value>
 							</rim:ValueList>
 						</rim:Slot>
 						<rim:Slot name="languageCode">
@@ -248,12 +248,12 @@
 						</rim:Slot>
 						<rim:Slot name="serviceStartTime">
 							<rim:ValueList>
-								<rim:Value>20231216014613</rim:Value>
+								<rim:Value>DATETIME</rim:Value>
 							</rim:ValueList>
 						</rim:Slot>
 						<rim:Slot name="serviceStopTime">
 							<rim:ValueList>
-								<rim:Value>20231216014613</rim:Value>
+								<rim:Value>DATETIME</rim:Value>
 							</rim:ValueList>
 						</rim:Slot>
 					</rim:ExtrinsicObject>

@@ -1,6 +1,5 @@
 package de.uksh.medic.etl.openehrmapper;
 
-import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.archetyped.Archetyped;
 import com.nedap.archie.rm.archetyped.TemplateId;
 import com.nedap.archie.rm.composition.Composition;
@@ -13,8 +12,8 @@ import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
-import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Map;
 import javax.xml.bind.JAXBException;
@@ -25,13 +24,16 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
+import org.joda.time.LocalDateTime;
 import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
 public class EHRParser {
-    public String build(Map<String, Object> map)
-            throws ParserConfigurationException, SAXException, XPathExpressionException, IOException, JAXBException {
-        String file = "oBDS_ST.opt";
+    public Composition build(String xml, Map<String, Object> map)
+            throws ParserConfigurationException, SAXException, XPathExpressionException, IOException,
+            JAXBException {
+
         String pathContent = "/template/definition[rm_type_name = \"COMPOSITION\"]"
                 + "/attributes[rm_attribute_name=\"content\"]";
         String pathContext = "/template/definition[rm_type_name = \"COMPOSITION\"]"
@@ -45,7 +47,8 @@ public class EHRParser {
 
         factory.setNamespaceAware(false); // never forget this!
         DocumentBuilder builder = factory.newDocumentBuilder();
-        Document doc = builder.parse(new File(file));
+        InputSource is = new InputSource(new StringReader(xml));
+        Document doc = builder.parse(is);
 
         composition.setArchetypeNodeId(
                 ((String) xp.evaluate("/template/definition/archetype_id", doc, XPathConstants.STRING))
@@ -73,7 +76,7 @@ public class EHRParser {
         composition.setCategory(new DvCodedText("event", new CodePhrase(new TerminologyId("openehr"), "433")));
 
         composition.setComposer(new PartySelf());
-        map.put("start_time", "20191122T101638,642+0000"); // need to fix
+        map.put("start_time", map.getOrDefault("start_time", LocalDateTime.now().toString()));
 
         Generator g = new Generator(doc);
         Map<String, Object> applyMap = Generator.applyDefaults(map);
@@ -89,16 +92,7 @@ public class EHRParser {
         context.setOtherContext(itemTree);
         Generator.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap);
 
-        System.out.println("Finished JSON-Generation. Generating String.");
-
-        String ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
-
-        // Marshaller marshaller = JAXBUtil.getArchieJAXBContext().createMarshaller();
-        // StringWriter writer = new StringWriter();
-        // marshaller.marshal(composition, writer);
-        // String ehr = writer.toString();
-
-        return ehr;
+        return composition;
 
     }
 

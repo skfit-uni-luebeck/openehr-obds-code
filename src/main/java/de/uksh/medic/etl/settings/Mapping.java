@@ -10,6 +10,7 @@ public class Mapping {
     private String target;
     private String targetVersion;
     private boolean split;
+    private String templateId;
 
     public String getSource() {
         return source;
@@ -49,6 +50,14 @@ public class Mapping {
 
     public void setSplit(boolean split) {
         this.split = split;
+    }
+
+    public String getTemplateId() {
+        return templateId;
+    }
+
+    public void setTemplateId(String templateId) {
+        this.templateId = templateId;
     }
 
 }

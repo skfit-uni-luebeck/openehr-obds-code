@@ -3,6 +3,8 @@ package de.uksh.medic.etl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.nedap.archie.json.JacksonUtil;
+import com.nedap.archie.rm.composition.Composition;
 import de.uksh.medic.etl.jobs.FhirResolver;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrAttributes;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrConvert;
@@ -22,14 +24,31 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import javax.xml.bind.JAXBException;
+import javax.xml.namespace.QName;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
+import org.apache.xmlbeans.XmlOptions;
+import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
+import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
+import org.ehrbase.openehr.sdk.serialisation.flatencoding.std.marshal.FlatJsonMarshaller;
+import org.ehrbase.openehr.sdk.webtemplate.model.WebTemplate;
+import org.ehrbase.openehr.sdk.webtemplate.parser.OPTParser;
+import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.support.BasicAuthenticationInterceptor;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.tinylog.Logger;
 import org.xml.sax.SAXException;
 
@@ -50,7 +69,7 @@ public final class OpenEhrObds {
         ConfigurationLoader configLoader = new ConfigurationLoader();
         configLoader.loadConfiguration(settingsYaml, Settings.class);
 
-        FhirResolver.initalize();
+        FhirResolver.initialize();
         CxxMdrSettings mdrSettings = Settings.getCxxmdr();
         if (mdrSettings != null) {
             CxxMdrLogin.login(mdrSettings);
@@ -79,7 +98,7 @@ public final class OpenEhrObds {
 
         // ToDo: Replace with Kafka consumer
 
-        File f = new File("op.xml");
+        File f = new File("syst.xml");
 
         Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
@@ -96,7 +115,7 @@ public final class OpenEhrObds {
             return;
         }
 
-        Boolean split = Settings.getMapping().containsKey(path)
+        boolean split = Settings.getMapping().containsKey(path)
                 && Settings.getMapping().get(path).getSplit();
 
         Map<String, Object> theMap = resMap;
@@ -106,16 +125,17 @@ public final class OpenEhrObds {
             Mapping m = Settings.getMapping().get(path);
 
             Map<String, Object> mapped = convertMdr(xmlSet, m);
+            assert mapped != null;
             mapped.values().removeIf(Objects::isNull);
             listConv(mapped);
             mapped.entrySet().forEach(e -> queryFhirTs(m, e));
-            Map<String, Object> result = formatMap((Map<String, Object>) mapped);
+            Map<String, Object> result = formatMap(mapped);
 
             result.putAll(resMap);
             theMap = result;
 
             if (split) {
-                buildOpenEhrComposition(result);
+                buildOpenEhrComposition(m.getTemplateId(), result);
             }
 
         }
@@ -143,18 +163,12 @@ public final class OpenEhrObds {
 
     private static void listConv(Map<String, Object> input) {
         input.entrySet().forEach(e -> {
-            if (e.getValue() == null) {
+            if (e.getValue() == null || e.getValue() instanceof List) {
                 return;
             }
-            switch (e.getValue()) {
-                case @SuppressWarnings("rawtypes") List l -> {
-                }
-                default -> {
-                    List<Object> l = new ArrayList<>();
-                    l.add(e.getValue());
-                    e.setValue(l);
-                }
-            }
+            List<Object> l = new ArrayList<>();
+            l.add(e.getValue());
+            e.setValue(l);
         });
     }
 
@@ -193,8 +207,7 @@ public final class OpenEhrObds {
     private static Map<String, Object> formatMap(Map<String, Object> input) {
         Map<String, Object> out = new LinkedHashMap<>();
         for (Entry<String, Object> e : input.entrySet()) {
-            ArrayList<String> al = new ArrayList<>();
-            al.addAll(Arrays.asList(e.getKey().split("/")));
+            ArrayList<String> al = new ArrayList<>(Arrays.asList(e.getKey().split("/")));
             splitMap(e.getValue(), al, out);
         }
         return out;
@@ -231,26 +244,100 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings("unchecked")
-    private static void buildOpenEhrComposition(Map<String, Object> data) {
+    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data) {
+
+        WebTemplate template = null;
+        String xml = null;
+
+        try {
+            URI ehrBaseUrl = Settings.getOpenEhrUrl();
+            if (Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
+                String credentials = ehrBaseUrl.toString();
+                ehrBaseUrl = new URI(credentials.replace("://",
+                        "://" + Settings.getOpenEhrUser() + ":" + Settings.getOpenEhrPassword() + "@"));
+            }
+            DefaultRestClient client = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
+            Optional<OPERATIONALTEMPLATE> oTemplate = client.templateEndpoint().findTemplate(templateId);
+            assert oTemplate.isPresent();
+            XmlOptions opts = new XmlOptions();
+            opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
+            xml = oTemplate.get().xmlText(opts);
+            template = new OPTParser(oTemplate.get()).parse();
+        } catch (URISyntaxException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
         EHRParser ep = new EHRParser();
+        String ehr = "";
+        Composition composition = null;
+
         try (BufferedWriter writer = new BufferedWriter(
-                new FileWriter(i + "_" + ((List<String>) data.get("ehr_id")).get(0) + ".json"))) {
-            String ehr = ep.build(data);
+                new FileWriter(i + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
+
+            // Write JSON to file
+            composition = ep.build(xml, data);
+
+            System.out.println("Finished JSON-Generation. Generating String.");
+
+            ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
             writer.write(ehr);
-            String content = Files.readString(new File("iti41.xml").toPath());
-            content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).get(0));
-            content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(ehr.getBytes())));
-            content = content.replace("UUID1", UUID.randomUUID().toString());
-            content = content.replace("UUID2", UUID.randomUUID().toString());
-            content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));
-            BufferedWriter writerXDS = new BufferedWriter(
-                    new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).get(0) + ".xml"));
-            writerXDS.write(content);
-            writerXDS.close();
+
         } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException
                 | JAXBException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
+        }
+
+        // if ("raw".equals(Settings.getTarget())) {
+
+        // }
+
+        if ("xds".equals(Settings.getTarget())) {
+            // create flat json
+            FlatJsonMarshaller fjm = new FlatJsonMarshaller();
+            ehr = fjm.toFlatJson(composition, template);
+
+            // Convert to TDD
+
+            RestTemplate rt = new RestTemplate();
+            if (Settings.getOpenEhrUser() != null || Settings.getOpenEhrPassword() != null) {
+                rt.getInterceptors().add(
+                        new BasicAuthenticationInterceptor(Settings.getOpenEhrUser(), Settings.getOpenEhrPassword()));
+            }
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.set("templateId", templateId);
+            form.set("format", "FLAT");
+            UriComponentsBuilder builder = UriComponentsBuilder
+                    .fromHttpUrl(Settings.getOpenEhrUrl() + "rest/v1/composition/convert/tdd");
+            builder.queryParams(form);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Content-Type", "application/json");
+            headers.set("Accept", "application/xml");
+
+            String tdd = rt.postForObject(builder.build().encode().toUri(), new HttpEntity<>(ehr, headers),
+                    String.class);
+
+            // XDS Envelope
+
+            try (InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream("iti41.xml")) {
+                assert is != null;
+                String content = new String(is.readAllBytes());
+                content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).getFirst());
+                content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(tdd.getBytes())));
+                content = content.replace("UUID1", UUID.randomUUID().toString());
+                content = content.replace("UUID2", UUID.randomUUID().toString());
+                content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));
+                content = content.replace("DATETIME",
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+                BufferedWriter writerXDS = new BufferedWriter(
+                        new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".xml"));
+                writerXDS.write(content);
+                writerXDS.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

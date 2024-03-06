@@ -23,7 +23,7 @@ public final class FhirResolver {
     /**
      * Initializes the class by creating clients for clinical data and terminology.
      */
-    public static void initalize() {
+    public static void initialize() {
         if (Settings.getFhirTsUrl() != null) {
             terminologyClient = ctx.newRestfulGenericClient(Settings.getFhirTsUrl().toString());
         }
