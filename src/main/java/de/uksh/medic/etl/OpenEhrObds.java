@@ -5,6 +5,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
+import com.nedap.archie.rm.datavalues.DvText;
+import com.nedap.archie.rm.ehr.EhrStatus;
+import com.nedap.archie.rm.generic.PartySelf;
+import com.nedap.archie.rm.support.identification.HierObjectId;
+import com.nedap.archie.rm.support.identification.PartyRef;
 import de.uksh.medic.etl.jobs.FhirResolver;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrAttributes;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrConvert;
@@ -38,17 +43,11 @@ import javax.xml.xpath.XPathExpressionException;
 import org.apache.xmlbeans.XmlOptions;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
-import org.ehrbase.openehr.sdk.serialisation.flatencoding.std.marshal.FlatJsonMarshaller;
+import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
+import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
 import org.ehrbase.openehr.sdk.webtemplate.model.WebTemplate;
 import org.ehrbase.openehr.sdk.webtemplate.parser.OPTParser;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.client.support.BasicAuthenticationInterceptor;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.tinylog.Logger;
 import org.xml.sax.SAXException;
 
@@ -248,25 +247,25 @@ public final class OpenEhrObds {
 
         WebTemplate template = null;
         String xml = null;
+        URI ehrBaseUrl = Settings.getOpenEhrUrl();
 
-        try {
-            URI ehrBaseUrl = Settings.getOpenEhrUrl();
-            if (Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
-                String credentials = ehrBaseUrl.toString();
+        if (Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
+            String credentials = ehrBaseUrl.toString();
+            try {
                 ehrBaseUrl = new URI(credentials.replace("://",
                         "://" + Settings.getOpenEhrUser() + ":" + Settings.getOpenEhrPassword() + "@"));
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
             }
-            DefaultRestClient client = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
-            Optional<OPERATIONALTEMPLATE> oTemplate = client.templateEndpoint().findTemplate(templateId);
-            assert oTemplate.isPresent();
-            XmlOptions opts = new XmlOptions();
-            opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
-            xml = oTemplate.get().xmlText(opts);
-            template = new OPTParser(oTemplate.get()).parse();
-        } catch (URISyntaxException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
         }
+
+        DefaultRestClient client = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
+        Optional<OPERATIONALTEMPLATE> oTemplate = client.templateEndpoint().findTemplate(templateId);
+        assert oTemplate.isPresent();
+        XmlOptions opts = new XmlOptions();
+        opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
+        xml = oTemplate.get().xmlText(opts);
+        template = new OPTParser(oTemplate.get()).parse();
 
         EHRParser ep = new EHRParser();
         String ehr = "";
@@ -289,35 +288,54 @@ public final class OpenEhrObds {
             e.printStackTrace();
         }
 
-        // if ("raw".equals(Settings.getTarget())) {
-
-        // }
+        if ("raw".equals(Settings.getTarget())) {
+            QueryResponseData ehrIds = client.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                    "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                            + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
+            UUID ehrId = null;
+            if (ehrIds.getColumns().size() == 0) {
+                EhrStatus es = new EhrStatus();
+                es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
+                es.setName(new DvText("EHR status"));
+                es.setQueryable(true);
+                es.setModifiable(true);
+                es.setSubject(new PartySelf(new PartyRef(
+                        new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()), "DEMOGRAPHIC", "PERSON")));
+                ehrId = client.ehrEndpoint().createEhr(es);
+            } else if (ehrIds.getColumns().size() == 1) {
+                ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+            }
+            client.compositionEndpoint(ehrId).mergeRaw(composition);
+        }
 
         if ("xds".equals(Settings.getTarget())) {
-            // create flat json
-            FlatJsonMarshaller fjm = new FlatJsonMarshaller();
-            ehr = fjm.toFlatJson(composition, template);
+            // // create flat json
+            // FlatJsonMarshaller fjm = new FlatJsonMarshaller();
+            // ehr = fjm.toFlatJson(composition, template);
 
-            // Convert to TDD
+            // // Convert to TDD
 
-            RestTemplate rt = new RestTemplate();
-            if (Settings.getOpenEhrUser() != null || Settings.getOpenEhrPassword() != null) {
-                rt.getInterceptors().add(
-                        new BasicAuthenticationInterceptor(Settings.getOpenEhrUser(), Settings.getOpenEhrPassword()));
-            }
-            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            form.set("templateId", templateId);
-            form.set("format", "FLAT");
-            UriComponentsBuilder builder = UriComponentsBuilder
-                    .fromHttpUrl(Settings.getOpenEhrUrl() + "rest/v1/composition/convert/tdd");
-            builder.queryParams(form);
+            // RestTemplate rt = new RestTemplate();
+            // if (Settings.getOpenEhrUser() != null || Settings.getOpenEhrPassword() !=
+            // null) {
+            // rt.getInterceptors().add(
+            // new BasicAuthenticationInterceptor(Settings.getOpenEhrUser(),
+            // Settings.getOpenEhrPassword()));
+            // }
+            // MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            // form.set("templateId", templateId);
+            // form.set("format", "FLAT");
+            // UriComponentsBuilder builder = UriComponentsBuilder
+            // .fromHttpUrl(Settings.getOpenEhrUrl() + "rest/v1/composition/convert/tdd");
+            // builder.queryParams(form);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Content-Type", "application/json");
-            headers.set("Accept", "application/xml");
+            // HttpHeaders headers = new HttpHeaders();
+            // headers.set("Content-Type", "application/json");
+            // headers.set("Accept", "application/xml");
 
-            String tdd = rt.postForObject(builder.build().encode().toUri(), new HttpEntity<>(ehr, headers),
-                    String.class);
+            // String tdd = rt.postForObject(builder.build().encode().toUri(), new
+            // HttpEntity<>(ehr, headers),
+            // String.class);
 
             // XDS Envelope
 
@@ -325,7 +343,7 @@ public final class OpenEhrObds {
                 assert is != null;
                 String content = new String(is.readAllBytes());
                 content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).getFirst());
-                content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(tdd.getBytes())));
+                content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(ehr.getBytes())));
                 content = content.replace("UUID1", UUID.randomUUID().toString());
                 content = content.replace("UUID2", UUID.randomUUID().toString());
                 content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));

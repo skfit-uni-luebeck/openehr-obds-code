@@ -171,7 +171,7 @@
 							classifiedObject="urn:uuid:UUID2"
 							id="cl7"
 							objectType="urn:oasis:names:tc:ebxml-regrep:ObjectType:RegistryObject:Classification"
-							nodeRepresentation="tdd">
+							nodeRepresentation="raw">
 							<rim:Slot name="codingScheme">
 								<rim:ValueList>
 									<rim:Value>1.3.6.1.4.1.19376.1.2.3</rim:Value>
