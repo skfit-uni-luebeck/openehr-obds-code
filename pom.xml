@@ -55,6 +55,16 @@
             <version>3.9.0</version>
         </dependency>
         <dependency>
+            <groupId>org.ehrbase.openehr.sdk</groupId>
+            <artifactId>serialisation</artifactId>
+            <version>2.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ehrbase.openehr.sdk</groupId>
+            <artifactId>client</artifactId>
+            <version>2.7.0</version>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
             <version>2.16.1</version>
