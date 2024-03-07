@@ -50,34 +50,33 @@ import org.w3c.dom.NodeList;
 
 public class Generator {
 
-    public static final List<Map<String, Object>> JSONMAP = new ArrayList<>();
-    private static Document opt;
     private static final XPath XP = XPathFactory.newInstance().newXPath();
-    private static final Map<String, String> CACHE = new HashMap<>();
-    private static final Map<String, NodeList> CACHE_NODE_LIST = new LinkedHashMap<>();
+    private final Document opt;
+    private final Map<String, String> cache = new HashMap<>();
+    private final Map<String, NodeList> cacheNodeList = new LinkedHashMap<>();
 
     public Generator(Document opt) {
-        Generator.opt = opt;
+        this.opt = opt;
         generateCache();
     }
 
     private void generateCache() {
     }
 
-    public static void processAttributeChildren(String path, String name, Object jsonmap,
+    public void processAttributeChildren(String path, String name, Object jsonmap,
             Map<String, Object> map) {
         String newPath = path + "/children";
-        if (!CACHE_NODE_LIST.containsKey(newPath + "/rm_type_name")) {
+        if (!cacheNodeList.containsKey(newPath + "/rm_type_name")) {
             XPathExpression expr;
             try {
                 expr = XP.compile(newPath + "/rm_type_name");
-                CACHE_NODE_LIST.put(newPath + "/rm_type_name", (NodeList) expr.evaluate(opt, XPathConstants.NODESET));
+                cacheNodeList.put(newPath + "/rm_type_name", (NodeList) expr.evaluate(opt, XPathConstants.NODESET));
             } catch (XPathExpressionException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
-        NodeList children = CACHE_NODE_LIST.get(newPath + "/rm_type_name");
+        NodeList children = cacheNodeList.get(newPath + "/rm_type_name");
         for (int i = 0; i < children.getLength(); i++) {
             if (children.item(i) == null || children.item(i).getFirstChild() == null || map == null) {
                 System.out.print("null");
@@ -87,9 +86,9 @@ public class Generator {
             type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "");
             Method met;
             try {
-                met = Generator.class.getMethod(type, String.class, String.class, Object.class,
+                met = this.getClass().getMethod(type, String.class, String.class, Object.class,
                         Map.class);
-                met.invoke(Generator.class, newPath + "[" + (i + 1) + "]", name, jsonmap, map);
+                met.invoke(this, newPath + "[" + (i + 1) + "]", name, jsonmap, map);
             } catch (NoSuchMethodException | SecurityException | IllegalAccessException | InvocationTargetException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -101,7 +100,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/ehr.html#_class_descriptions_4
 
     @SuppressWarnings("unchecked")
-    public static void gen_SECTION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_SECTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String label = getTypeLabel(path, getNodeId(path));
@@ -121,7 +120,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/ehr.html#_class_descriptions_5
 
     @SuppressWarnings("unchecked")
-    public static void gen_ADMIN_ENTRY(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ADMIN_ENTRY(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
 
         String paramName = getArcheTypeId(path);
@@ -147,7 +146,7 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public static void gen_OBSERVATION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_OBSERVATION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -172,7 +171,7 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public static void gen_EVALUATION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_EVALUATION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -198,7 +197,7 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public static void gen_INSTRUCTION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_INSTRUCTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oapActivities = path + "/attributes[rm_attribute_name=\"activities\"]";
@@ -229,7 +228,7 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public static void gen_ACTIVITY(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ACTIVITY(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String nodeId = getNodeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"description\"]";
@@ -251,7 +250,7 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public static void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oapDescription = path + "/attributes[rm_attribute_name=\"description\"]";
@@ -295,13 +294,13 @@ public class Generator {
 
     // ITEM_TABLE
 
-    public static void gen_ITEM_TREE(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ITEM_TREE(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
-        if (!CACHE.containsKey(path + "/../rm_attribute_name")) {
+        if (!cache.containsKey(path + "/../rm_attribute_name")) {
             XPathExpression expr = XP.compile(path + "/../rm_attribute_name");
-            CACHE.put(path + "/../rm_attribute_name", (String) expr.evaluate(opt, XPathConstants.STRING));
+            cache.put(path + "/../rm_attribute_name", (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        String attributeName = CACHE.get(path + "/../rm_attribute_name");
+        String attributeName = cache.get(path + "/../rm_attribute_name");
         String nodeId = getNodeId(path);
         String newPath = path + "/attributes";
         if ("".equals(attributeName)) {
@@ -320,15 +319,15 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_structures.html#_class_descriptions_3
 
     @SuppressWarnings("unchecked")
-    public static void gen_CLUSTER(String path, String name, Object jsonmap,
+    public void gen_CLUSTER(String path, String name, Object jsonmap,
             Map<String, Object> map)
             throws Exception {
-        if (!CACHE.containsKey(path + "/archetype_id")) {
+        if (!cache.containsKey(path + "/archetype_id")) {
             XPathExpression expr = XP.compile(path + "/archetype_id");
-            CACHE.put(path + "/archetype_id",
+            cache.put(path + "/archetype_id",
                     ((String) expr.evaluate(opt, XPathConstants.STRING)).trim());
         }
-        String cAID = CACHE.get(path + "/archetype_id");
+        String cAID = cache.get(path + "/archetype_id");
         String paramName = !"".equals(cAID) ? cAID : name;
         String nodeId = getNodeId(path);
         Boolean isSlot = ((String) XP.evaluate(path + "/@type", opt, XPathConstants.STRING)).equals("C_ARCHETYPE_ROOT");
@@ -349,7 +348,7 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public static void gen_ELEMENT(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ELEMENT(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String nodeId = getNodeId(path);
         String newPath = path + "/attributes[rm_attribute_name = \"value\"]";
@@ -388,7 +387,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_structures.html#_class_descriptions_4
 
     @SuppressWarnings("unchecked")
-    public static void gen_HISTORY(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_HISTORY(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
@@ -404,7 +403,7 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public static void gen_EVENT(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_EVENT(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
@@ -428,14 +427,14 @@ public class Generator {
     // Basic Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions
 
-    public static void gen_DV_BOOLEAN(String path, String name, Object jsonmap,
+    public void gen_DV_BOOLEAN(String path, String name, Object jsonmap,
             Map<String, Boolean> map) {
         ((Element) jsonmap).setValue(new DvBoolean(map.get(name)));
     }
 
     // DV_STATE
 
-    public static void gen_DV_IDENTIFIER(String path, String name, Object jsonmap,
+    public void gen_DV_IDENTIFIER(String path, String name, Object jsonmap,
             Map<String, Object> map) throws Exception {
         DvIdentifier id = new DvIdentifier();
         id.setId(String.valueOf(map.get(name)));
@@ -445,7 +444,7 @@ public class Generator {
     // Text Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_2
 
-    public static void gen_DV_TEXT(String path, String name, Object jsonmap,
+    public void gen_DV_TEXT(String path, String name, Object jsonmap,
             Map<String, String> map)
             throws Exception {
         if (!map.containsKey(name)) {
@@ -458,7 +457,7 @@ public class Generator {
 
     // CODE_PHRASE
 
-    public static void gen_DV_CODED_TEXT(String path, String name, Object jsonmap,
+    public void gen_DV_CODED_TEXT(String path, String name, Object jsonmap,
             Map<String, Object> map) throws Exception {
 
         DvCodedText ct = new DvCodedText();
@@ -497,7 +496,7 @@ public class Generator {
 
     }
 
-    // public static void gen_DV_PARAGRAPH(String path, String name, Object jsonmap,
+    // public void gen_DV_PARAGRAPH(String path, String name, Object jsonmap,
     // Map<String, List<String>> map)
     // throws Exception {
     // if (!map.containsKey(name)) {
@@ -519,14 +518,14 @@ public class Generator {
 
     // REFERENCE_RANGE
 
-    public static void gen_DV_ORDINAL(String path, String name, Object jsonmap,
+    public void gen_DV_ORDINAL(String path, String name, Object jsonmap,
             Map<String, String> map) throws Exception {
         DvOrdinal dvo = new DvOrdinal();
         Long value = Long.valueOf(map.get(name));
         dvo.setValue(value);
         String ordinal = getOrdinal(path, map.get(name));
         String display = getLabel(ordinal, map.get("name"));
-        DvCodedText ct = new DvCodedText(display, new CodePhrase(new TerminologyId("local_terms"), ordinal, display));
+        DvCodedText ct = new DvCodedText(display, new CodePhrase(new TerminologyId("local"), ordinal, display));
         dvo.setSymbol(ct);
         ((Element) jsonmap).setValue(dvo);
     }
@@ -536,12 +535,12 @@ public class Generator {
 
     // DV_AMOUNT
 
-    public static void gen_DV_QUANTITY(String path, String name, Object jsonmap,
+    public void gen_DV_QUANTITY(String path, String name, Object jsonmap,
             Map<String, String> map) {
         ((Element) jsonmap).setValue(new DvQuantity("1", Double.valueOf(map.get(name)), 1L));
     }
 
-    public static void gen_DV_COUNT(String path, String name, Object jsonmap,
+    public void gen_DV_COUNT(String path, String name, Object jsonmap,
             Map<String, Long> map) {
         ((Element) jsonmap).setValue(new DvCount(map.get(name)));
     }
@@ -555,14 +554,14 @@ public class Generator {
     // DateTime Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_4
 
-    public static void gen_DV_DATE(String path, String name, Object jsonmap,
+    public void gen_DV_DATE(String path, String name, Object jsonmap,
             Map<String, String> map) {
         ((Element) jsonmap).setValue(new DvDate(map.get(name)));
     }
 
     // DV_TIME
 
-    public static void gen_DV_DATE_TIME(String path, String name, Object jsonmap,
+    public void gen_DV_DATE_TIME(String path, String name, Object jsonmap,
             Map<String, String> map) {
         ((Element) jsonmap).setValue(new DvDateTime(map.get(name)));
     }
@@ -586,7 +585,7 @@ public class Generator {
     // URI Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_7
 
-    public static void gen_DV_URI(String path, String name, Object jsonmap,
+    public void gen_DV_URI(String path, String name, Object jsonmap,
             Map<String, Object> map)
             throws Exception {
         ((Element) jsonmap).setValue(new DvURI(String.valueOf(map.get(name))));
@@ -596,83 +595,94 @@ public class Generator {
 
     // XPath Query functions
 
-    private static Boolean isMandatory(String path) throws Exception {
+    private Boolean isMandatory(String path) throws Exception {
         String newPath = path + "/occurrences/lower/text()";
-        if (!CACHE.containsKey(newPath)) {
+        if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return "1".equals(CACHE.get(newPath));
+        return "1".equals(cache.get(newPath));
     }
 
-    private static String getOrdinal(String path, String code) throws Exception {
+    private String getOrdinal(String path, String code) throws Exception {
         String newPath = path + "/list[value/text()=\"" + code + "\"]/symbol/defining_code/code_string/text()";
-        if (!CACHE.containsKey(newPath)) {
+        if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return CACHE.get(newPath);
+        return cache.get(newPath);
     }
 
-    private static String getLabel(String code, String archetype) throws Exception {
+    private String getLabel(String code, String archetype) throws Exception {
         String path = "//archetype_id[value=\"" + archetype + "\"]/../term_definitions[@code=\"" + code
                 + "\"]/items[@id=\"text\"]/text()";
-        if (!CACHE.containsKey(path)) {
+        if (!cache.containsKey(path)) {
             XPathExpression expr = XP.compile(path);
-            CACHE.put(path, (String) expr.evaluate(opt, XPathConstants.STRING));
+            cache.put(path, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return CACHE.get(path);
+        return cache.get(path);
     }
 
-    private static String getTypeLabel(String path, String code) throws Exception {
+    private String getTypeLabel(String path, String code) throws Exception {
         String newPath = path + "/term_definitions[@code=\"" + code + "\"]/items[@id=\"text\"]";
-        if (!CACHE.containsKey(newPath)) {
+        if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return CACHE.get(newPath);
+        return cache.get(newPath);
     }
 
-    private static String getLocalTerminologyTerm(String archetype, String code) throws Exception {
+    private String getLocalTerminologyTerm(String archetype, String code) throws Exception {
         String newPath = "//archetype_id[value/text()=\"" + archetype + "\"]/../term_definitions[@code=\"local_terms::"
                 + code + "\"]/items/text()";
-        if (!CACHE.containsKey(newPath)) {
+        if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            CACHE.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
+            cache.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
                     .replaceAll("\\n", " "));
         }
-        return CACHE.get(newPath);
+        return cache.get(newPath);
     }
 
-    private static String getLocalTerm(String path, String code) throws Exception {
-        String newPath = "//term_definitions[items/@id=\"text\"][items/text()=\"" + code + "\"]/@code";
-        if (!CACHE.containsKey(newPath)) {
-            XPathExpression expr = XP.compile(newPath);
-            CACHE.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
-                    .replaceAll("\\n", " "));
+    private String getLocalTerm(String path, String code) throws Exception {
+        String allowedCodesPath = path + "/attributes/children/code_list";
+        XPathExpression expr = XP.compile(allowedCodesPath);
+        NodeList nl = (NodeList) expr.evaluate(opt, XPathConstants.NODESET);
+        List<String> codes = new ArrayList<>();
+        for (int i = 0; i < nl.getLength(); i++) {
+            codes.add(nl.item(i).getTextContent());
         }
-        return CACHE.get(newPath);
+        
+        String codePath = "//term_definitions[items/@id=\"text\"][items/text()=\"" + code + "\"]/@code";
+        XPathExpression expr2 = XP.compile(codePath);
+        NodeList nl2 = (NodeList) expr2.evaluate(opt, XPathConstants.NODESET);
+        for (int i = 0; i < nl2.getLength(); i++) {
+            if (codes.contains(nl2.item(i).getTextContent())) {
+                return nl2.item(i).getTextContent();
+            }
+        }
+    
+        return null; 
     }
 
-    private static String getNodeId(String path) throws Exception {
+    private String getNodeId(String path) throws Exception {
         String newPath = path + "/node_id";
-        if (!CACHE.containsKey(newPath)) {
+        if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return CACHE.get(newPath);
+        return cache.get(newPath);
     }
 
-    private static String getArcheTypeId(String path) throws Exception {
+    private String getArcheTypeId(String path) throws Exception {
         String newPath = path + "/archetype_id/value";
-        if (!CACHE.containsKey(newPath)) {
+        if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            CACHE.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return CACHE.get(newPath);
+        return cache.get(newPath);
     }
 
-    public static Map<String, Object> getDefaultValues() {
+    public Map<String, Object> getDefaultValues() {
         Map<String, Object> defaults = new HashMap<>();
         Map<String, Object> current = defaults;
         String path = "//constraints/attributes[children/default_value]";
@@ -707,7 +717,7 @@ public class Generator {
         return defaults;
     }
 
-    public static Map<String, Object> applyDefaults(Map<String, Object> map) {
+    public Map<String, Object> applyDefaults(Map<String, Object> map) {
         Map<String, Object> defaults = getDefaultValues();
         deepMerge(defaults, map);
         return defaults;
