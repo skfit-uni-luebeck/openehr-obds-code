@@ -651,7 +651,7 @@ public class Generator {
         for (int i = 0; i < nl.getLength(); i++) {
             codes.add(nl.item(i).getTextContent());
         }
-        
+
         String codePath = "//term_definitions[items/@id=\"text\"][items/text()=\"" + code + "\"]/@code";
         XPathExpression expr2 = XP.compile(codePath);
         NodeList nl2 = (NodeList) expr2.evaluate(opt, XPathConstants.NODESET);
@@ -660,8 +660,8 @@ public class Generator {
                 return nl2.item(i).getTextContent();
             }
         }
-    
-        return null; 
+
+        return null;
     }
 
     private String getNodeId(String path) throws Exception {
