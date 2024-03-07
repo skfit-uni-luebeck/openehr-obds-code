@@ -45,8 +45,6 @@ import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
-import org.ehrbase.openehr.sdk.webtemplate.model.WebTemplate;
-import org.ehrbase.openehr.sdk.webtemplate.parser.OPTParser;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
 import org.tinylog.Logger;
 import org.xml.sax.SAXException;
@@ -54,7 +52,9 @@ import org.xml.sax.SAXException;
 public final class OpenEhrObds {
 
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
+    private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
+    private static DefaultRestClient openEhrClient;
 
     private OpenEhrObds() {
     }
@@ -74,7 +74,29 @@ public final class OpenEhrObds {
             CxxMdrLogin.login(mdrSettings);
         }
 
+        URI ehrBaseUrl = Settings.getOpenEhrUrl();
+        if (Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
+            String credentials = ehrBaseUrl.toString();
+            try {
+                ehrBaseUrl = new URI(credentials.replace("://",
+                        "://" + Settings.getOpenEhrUser() + ":" + Settings.getOpenEhrPassword() + "@"));
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
+
         Settings.getMapping().values().forEach(m -> {
+            if (m.getTemplateId() != null) {
+                Optional<OPERATIONALTEMPLATE> oTemplate = openEhrClient.templateEndpoint()
+                        .findTemplate(m.getTemplateId());
+                assert oTemplate.isPresent();
+                XmlOptions opts = new XmlOptions();
+                opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
+                PARSERS.put(m.getTemplateId(), new EHRParser(oTemplate.get().xmlText(opts)));
+            }
+
             if (m.getSource() == null) {
                 return;
             }
@@ -91,19 +113,24 @@ public final class OpenEhrObds {
                     e.printStackTrace();
                 }
             });
+
         });
 
         XmlMapper xmlMapper = new XmlMapper();
 
+        Logger.info("OpenEhrObds started!");
+
         // ToDo: Replace with Kafka consumer
 
-        File f = new File("syst.xml");
+        // File f = new File("file_1705482004-clean.xml");
+        File f = new File("file_1705482019-clean.xml");
+        // File f = new File("file_1705482057-clean.xml");
+        // File f = new File("st.xml");
 
         Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
         }).entrySet(), 1, "", m);
 
-        Logger.info("OpenEhrObds started!");
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -245,37 +272,14 @@ public final class OpenEhrObds {
     @SuppressWarnings("unchecked")
     private static void buildOpenEhrComposition(String templateId, Map<String, Object> data) {
 
-        WebTemplate template = null;
-        String xml = null;
-        URI ehrBaseUrl = Settings.getOpenEhrUrl();
-
-        if (Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
-            String credentials = ehrBaseUrl.toString();
-            try {
-                ehrBaseUrl = new URI(credentials.replace("://",
-                        "://" + Settings.getOpenEhrUser() + ":" + Settings.getOpenEhrPassword() + "@"));
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        DefaultRestClient client = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
-        Optional<OPERATIONALTEMPLATE> oTemplate = client.templateEndpoint().findTemplate(templateId);
-        assert oTemplate.isPresent();
-        XmlOptions opts = new XmlOptions();
-        opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
-        xml = oTemplate.get().xmlText(opts);
-        template = new OPTParser(oTemplate.get()).parse();
-
-        EHRParser ep = new EHRParser();
         String ehr = "";
         Composition composition = null;
 
         try (BufferedWriter writer = new BufferedWriter(
-                new FileWriter(i + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
+                new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
 
             // Write JSON to file
-            composition = ep.build(xml, data);
+            composition = PARSERS.get(templateId).build(data);
 
             System.out.println("Finished JSON-Generation. Generating String.");
 
@@ -289,11 +293,11 @@ public final class OpenEhrObds {
         }
 
         if ("raw".equals(Settings.getTarget())) {
-            QueryResponseData ehrIds = client.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+            QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                     "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
                             + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
             UUID ehrId = null;
-            if (ehrIds.getColumns().size() == 0) {
+            if (ehrIds.getRows().size() == 0) {
                 EhrStatus es = new EhrStatus();
                 es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
                 es.setName(new DvText("EHR status"));
@@ -301,11 +305,11 @@ public final class OpenEhrObds {
                 es.setModifiable(true);
                 es.setSubject(new PartySelf(new PartyRef(
                         new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()), "DEMOGRAPHIC", "PERSON")));
-                ehrId = client.ehrEndpoint().createEhr(es);
-            } else if (ehrIds.getColumns().size() == 1) {
+                ehrId = openEhrClient.ehrEndpoint().createEhr(es);
+            } else if (ehrIds.getRows().size() == 1) {
                 ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
             }
-            client.compositionEndpoint(ehrId).mergeRaw(composition);
+            openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
         }
 
         if ("xds".equals(Settings.getTarget())) {
