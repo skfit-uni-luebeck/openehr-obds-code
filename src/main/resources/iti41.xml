@@ -97,7 +97,7 @@
 						</rim:Slot>
 					</rim:Association>
 					<rim:ExtrinsicObject id="urn:uuid:UUID2"
-						mimeType="text/xml"
+						mimeType="application/json"
 						objectType="urn:uuid:7edca82f-054d-47f2-a032-9b2a5b5186c1">
 						<rim:Classification
 							classificationScheme="urn:uuid:93606bcf-9494-43ec-9b4e-a7748d1a838d"
