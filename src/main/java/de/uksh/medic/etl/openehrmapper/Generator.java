@@ -126,23 +126,32 @@ public class Generator {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+        String label = getLabel(getNodeId(path), paramName);
 
-        AdminEntry adminEntry = new AdminEntry();
-        adminEntry.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
-        adminEntry.setArchetypeNodeId(paramName);
-        adminEntry.setNameAsString(getLabel(getNodeId(path), paramName));
-        adminEntry.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
-        adminEntry.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
-        adminEntry.setSubject(new PartySelf());
+        List<Map<String, Object>> l;
+        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(paramName);
+        } else {
+            l = List.of((Map<String, Object>) map.get(paramName));
+        }
 
-        if (map.containsKey(paramName)) {
-            ItemTree il = new ItemTree();
-            processAttributeChildren(oap, paramName, il, (Map<String, Object>) map.get(paramName));
-            adminEntry.setData(il);
+        l.forEach(le -> {
+
+            AdminEntry adminEntry = new AdminEntry();
+            adminEntry.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+            adminEntry.setArchetypeNodeId(paramName);
+            adminEntry.setNameAsString(label);
+            adminEntry.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+            adminEntry.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+            adminEntry.setSubject(new PartySelf());
+
+            ItemTree itemTree = new ItemTree();
+            processAttributeChildren(oap, paramName, itemTree, le);
+            adminEntry.setData(itemTree);
             if (oa) {
                 ((ArrayList<ContentItem>) jsonmap).add(adminEntry);
             }
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -151,23 +160,32 @@ public class Generator {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+        String label = getLabel(getNodeId(path), paramName);
 
-        Observation observation = new Observation();
-        observation.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
-        observation.setArchetypeNodeId(paramName);
-        observation.setNameAsString(getLabel(getNodeId(path), paramName));
-        observation.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
-        observation.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
-        observation.setSubject(new PartySelf());
+        List<Map<String, Object>> l;
+        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(paramName);
+        } else {
+            l = List.of((Map<String, Object>) map.get(paramName));
+        }
 
-        if (map.containsKey(paramName)) {
+        l.forEach(le -> {
+
+            Observation observation = new Observation();
+            observation.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+            observation.setArchetypeNodeId(paramName);
+            observation.setNameAsString(label);
+            observation.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+            observation.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+            observation.setSubject(new PartySelf());
+
             History<ItemStructure> history = new History<ItemStructure>();
-            processAttributeChildren(oap, paramName, history, (Map<String, Object>) map.get(paramName));
+            processAttributeChildren(oap, paramName, history, le);
             observation.setData(history);
             if (oa) {
                 ((List<ContentItem>) jsonmap).add(observation);
             }
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -176,23 +194,32 @@ public class Generator {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+        String label = getLabel(getNodeId(path), paramName);
 
-        Evaluation evaluation = new Evaluation();
-        evaluation.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
-        evaluation.setArchetypeNodeId(paramName);
-        evaluation.setNameAsString(getLabel(getNodeId(path), paramName));
-        evaluation.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
-        evaluation.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
-        evaluation.setSubject(new PartySelf());
+        List<Map<String, Object>> l;
+        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(paramName);
+        } else {
+            l = List.of((Map<String, Object>) map.get(paramName));
+        }
 
-        if (map.containsKey(paramName)) {
+        l.forEach(le -> {
+
+            Evaluation evaluation = new Evaluation();
+            evaluation.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+            evaluation.setArchetypeNodeId(paramName);
+            evaluation.setNameAsString(label);
+            evaluation.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+            evaluation.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+            evaluation.setSubject(new PartySelf());
+
             ItemTree data = new ItemTree();
-            processAttributeChildren(oap, paramName, data, (Map<String, Object>) map.get(paramName));
+            processAttributeChildren(oap, paramName, data, le);
             evaluation.setData(data);
             if (oa) {
                 ((List<ContentItem>) jsonmap).add(evaluation);
             }
-        }
+        });
 
     }
 
@@ -204,27 +231,36 @@ public class Generator {
         String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
         Boolean oaActivities = (Boolean) XP.evaluate(oapActivities, opt, XPathConstants.BOOLEAN);
         Boolean oaProtocol = (Boolean) XP.evaluate(oapProtocol, opt, XPathConstants.BOOLEAN);
+        String label = getLabel(getNodeId(path), paramName);
 
-        Instruction instruction = new Instruction();
-        instruction.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
-        instruction.setArchetypeNodeId(paramName);
-        instruction.setNameAsString(getLabel(getNodeId(path), paramName));
-        instruction.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
-        instruction.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
-        instruction.setSubject(new PartySelf());
-        instruction.setNarrative(new DvText(""));
+        List<Map<String, Object>> l;
+        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(paramName);
+        } else {
+            l = List.of((Map<String, Object>) map.get(paramName));
+        }
 
-        if (map.containsKey(paramName)) {
+        l.forEach(le -> {
+
+            Instruction instruction = new Instruction();
+            instruction.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+            instruction.setArchetypeNodeId(paramName);
+            instruction.setNameAsString(label);
+            instruction.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+            instruction.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+            instruction.setSubject(new PartySelf());
+            instruction.setNarrative(new DvText(""));
+
             List<Activity> activities = new ArrayList<>();
             ItemTree protocol = new ItemTree();
-            processAttributeChildren(oapActivities, paramName, activities, (Map<String, Object>) map.get(paramName));
-            processAttributeChildren(oapProtocol, paramName, protocol, (Map<String, Object>) map.get(paramName));
+            processAttributeChildren(oapActivities, paramName, activities, le);
+            processAttributeChildren(oapProtocol, paramName, protocol, le);
             instruction.setActivities(activities);
             instruction.setProtocol(protocol);
             if (oaActivities || oaProtocol) {
                 ((ArrayList<ContentItem>) jsonmap).add(instruction);
             }
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -233,20 +269,29 @@ public class Generator {
         String nodeId = getNodeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"description\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+        String label = getLabel(nodeId, name);
 
-        Activity activity = new Activity();
-        activity.setActionArchetypeId("openEHR-EHR-INSTRUCTION.service_request.v1");
-        activity.setArchetypeNodeId(nodeId);
-        activity.setNameAsString(getLabel(nodeId, name));
+        List<Map<String, Object>> l;
+        if (map.containsKey(nodeId) && map.get(nodeId) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(nodeId);
+        } else {
+            l = List.of((Map<String, Object>) map.get(nodeId));
+        }
 
-        if (map.containsKey(nodeId)) {
+        l.forEach(le -> {
+
+            Activity activity = new Activity();
+            activity.setActionArchetypeId("openEHR-EHR-INSTRUCTION.service_request.v1");
+            activity.setArchetypeNodeId(nodeId);
+            activity.setNameAsString(label);
+
             ItemTree itemTree = new ItemTree();
-            processAttributeChildren(oap, name, itemTree, (Map<String, Object>) map.get(nodeId));
+            processAttributeChildren(oap, name, itemTree, le);
             activity.setDescription(itemTree);
             if (oa) {
                 ((ArrayList<Activity>) jsonmap).add(activity);
             }
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -257,32 +302,40 @@ public class Generator {
         String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
         Boolean oaDescription = (Boolean) XP.evaluate(oapDescription, opt, XPathConstants.BOOLEAN);
         Boolean oaProtocol = (Boolean) XP.evaluate(oapProtocol, opt, XPathConstants.BOOLEAN);
+        String label = getLabel(getNodeId(path), paramName);
 
-        Action action = new Action();
-        action.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
-        action.setArchetypeNodeId(paramName);
-        action.setNameAsString(getLabel(getNodeId(path), paramName));
-        action.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
-        action.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
-        action.setSubject(new PartySelf());
-        IsmTransition ism = new IsmTransition();
-        ism.setCurrentState(
-                new DvCodedText("completed", new CodePhrase(new TerminologyId("openehr"), "532", "completed")));
-        action.setIsmTransition(ism);
+        List<Map<String, Object>> l;
+        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(paramName);
+        } else {
+            l = List.of((Map<String, Object>) map.get(paramName));
+        }
 
-        if (map.containsKey(paramName)) {
-            action.setTime(new DvDateTime(((Map<String, List<String>>) map.get(paramName)).get("time").get(0)));
+        l.forEach(le -> {
+            Action action = new Action();
+            action.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
+            action.setArchetypeNodeId(paramName);
+            action.setNameAsString(label);
+            action.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+            action.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
+            action.setSubject(new PartySelf());
+            IsmTransition ism = new IsmTransition();
+            ism.setCurrentState(
+                    new DvCodedText("completed", new CodePhrase(new TerminologyId("openehr"), "532", "completed")));
+            action.setIsmTransition(ism);
+            action.setTime(new DvDateTime(((List<String>) le.get("time")).getFirst()));
             ItemTree description = new ItemTree();
             ItemTree protocol = new ItemTree();
-            processAttributeChildren(oapDescription, paramName, description, (Map<String, Object>) map.get(paramName));
-            processAttributeChildren(oapProtocol, paramName, protocol, (Map<String, Object>) map.get(paramName));
+            processAttributeChildren(oapDescription, paramName, description, le);
+            processAttributeChildren(oapProtocol, paramName, protocol, le);
             action.setDescription(description);
             action.setProtocol(protocol);
 
             if (oaDescription || oaProtocol) {
                 ((ArrayList<ContentItem>) jsonmap).add(action);
             }
-        }
+        });
+
     }
 
     // Item Structure
@@ -338,13 +391,25 @@ public class Generator {
             return;
         }
         String label = getLabel(nodeId, paramName);
-        Cluster cluster = new Cluster();
-        cluster.setArchetypeNodeId(aNodeId);
-        cluster.setNameAsString(label);
-        ArrayList<Item> items = new ArrayList<Item>();
-        processAttributeChildren(newPath, paramName, items, (Map<String, Object>) map.get(code));
-        cluster.setItems(items);
-        ((ArrayList<Object>) jsonmap).add(cluster);
+
+        List<Map<String, Object>> l;
+        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(paramName);
+        } else {
+            l = List.of((Map<String, Object>) map.get(paramName));
+        }
+
+        l.forEach(le -> {
+
+            Cluster cluster = new Cluster();
+            cluster.setArchetypeNodeId(aNodeId);
+            cluster.setNameAsString(label);
+            ArrayList<Item> items = new ArrayList<Item>();
+            processAttributeChildren(newPath, paramName, items, le);
+            cluster.setItems(items);
+            ((ArrayList<Object>) jsonmap).add(cluster);
+
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -397,7 +462,7 @@ public class Generator {
 
         history.setNameAsString(label);
 
-        history.setOrigin(new DvDateTime((String) ((List<String>) map.get("events_time")).get(0)));
+        history.setOrigin(new DvDateTime((String) ((List<String>) map.get("events_time")).getFirst()));
 
         processAttributeChildren(newPath, nodeId, history, map);
     }
@@ -413,7 +478,7 @@ public class Generator {
 
         events.setNameAsString(label);
 
-        events.setTime(new DvDateTime((String) ((List<String>) map.get("events_time")).get(0)));
+        events.setTime(new DvDateTime((String) ((List<String>) map.get("events_time")).getFirst()));
         ItemTree itemTree = new ItemTree();
         processAttributeChildren(newPath, nodeId, itemTree, map);
         events.setData(itemTree);
