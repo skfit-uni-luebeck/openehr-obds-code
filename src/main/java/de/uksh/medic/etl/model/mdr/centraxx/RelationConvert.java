@@ -14,11 +14,11 @@ public class RelationConvert {
     @JsonProperty("srcProfileCode")
     private String sourceProfileCode;
     @JsonProperty("srcProfileVersion")
-    private String sourceProfileVersion;
+    private Integer sourceProfileVersion;
     @JsonProperty("trgProfileCode")
     private String targetProfileCode;
     @JsonProperty("trgProfileVersion")
-    private String targetProfileVersion;
+    private Integer targetProfileVersion;
     @JsonProperty("values")
     private Map<String, Object> values;
     @JsonProperty("logMessages")
@@ -32,11 +32,11 @@ public class RelationConvert {
         this.sourceProfileCode = sourceProfileCode;
     }
 
-    public String getSourceProfileVersion() {
+    public Integer getSourceProfileVersion() {
         return sourceProfileVersion;
     }
 
-    public void setSourceProfileVersion(String sourceProfileVersion) {
+    public void setSourceProfileVersion(Integer sourceProfileVersion) {
         this.sourceProfileVersion = sourceProfileVersion;
     }
 
@@ -48,11 +48,11 @@ public class RelationConvert {
         this.targetProfileCode = targetProfileCode;
     }
 
-    public String getTargetProfileVersion() {
+    public Integer getTargetProfileVersion() {
         return targetProfileVersion;
     }
 
-    public void setTargetProfileVersion(String targetProfileVersion) {
+    public void setTargetProfileVersion(Integer targetProfileVersion) {
         this.targetProfileVersion = targetProfileVersion;
     }
 

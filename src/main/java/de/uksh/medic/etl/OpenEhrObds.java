@@ -123,9 +123,9 @@ public final class OpenEhrObds {
         // ToDo: Replace with Kafka consumer
 
         // File f = new File("file_1705482004-clean.xml");
-        File f = new File("file_1705482019-clean.xml");
+        // File f = new File("file_1705482019-clean.xml");
         // File f = new File("file_1705482057-clean.xml");
-        // File f = new File("syst.xml");
+        File f = new File("tod.xml");
 
         Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
