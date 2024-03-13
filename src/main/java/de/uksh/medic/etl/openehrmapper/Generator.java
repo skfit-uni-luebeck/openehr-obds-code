@@ -393,10 +393,10 @@ public class Generator {
         String label = getLabel(nodeId, paramName);
 
         List<Map<String, Object>> l;
-        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
-            l = (List<Map<String, Object>>) map.get(paramName);
+        if (map.containsKey(aNodeId) && map.get(aNodeId) instanceof List) {
+            l = (List<Map<String, Object>>) map.get(aNodeId);
         } else {
-            l = List.of((Map<String, Object>) map.get(paramName));
+            l = List.of((Map<String, Object>) map.get(aNodeId));
         }
 
         l.forEach(le -> {
