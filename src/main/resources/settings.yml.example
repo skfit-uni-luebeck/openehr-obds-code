@@ -8,7 +8,9 @@ fhirTsUrl:
 openEhrUrl:
 openEhrUser:
 openEhrPassword:
+xdsUrl:
 target: raw
+# target: xds
 mapping:
   /Patient:
     source: obds-patient

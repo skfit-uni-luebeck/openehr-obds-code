@@ -46,6 +46,10 @@ import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRes
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.tinylog.Logger;
 import org.xml.sax.SAXException;
 
@@ -176,7 +180,6 @@ public final class OpenEhrObds {
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
                     for (Object b : a) {
-                        System.out.println(entry.getKey());
                         walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
                     }
                 }
@@ -298,7 +301,7 @@ public final class OpenEhrObds {
             // Write JSON to file
             composition = PARSERS.get(templateId).build(data);
 
-            System.out.println("Finished JSON-Generation. Generating String.");
+            Logger.debug("Finished JSON-Generation. Generating String.");
 
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
             writer.write(ehr);
@@ -330,34 +333,6 @@ public final class OpenEhrObds {
         }
 
         if ("xds".equals(Settings.getTarget())) {
-            // // create flat json
-            // FlatJsonMarshaller fjm = new FlatJsonMarshaller();
-            // ehr = fjm.toFlatJson(composition, template);
-
-            // // Convert to TDD
-
-            // RestTemplate rt = new RestTemplate();
-            // if (Settings.getOpenEhrUser() != null || Settings.getOpenEhrPassword() !=
-            // null) {
-            // rt.getInterceptors().add(
-            // new BasicAuthenticationInterceptor(Settings.getOpenEhrUser(),
-            // Settings.getOpenEhrPassword()));
-            // }
-            // MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            // form.set("templateId", templateId);
-            // form.set("format", "FLAT");
-            // UriComponentsBuilder builder = UriComponentsBuilder
-            // .fromHttpUrl(Settings.getOpenEhrUrl() + "rest/v1/composition/convert/tdd");
-            // builder.queryParams(form);
-
-            // HttpHeaders headers = new HttpHeaders();
-            // headers.set("Content-Type", "application/json");
-            // headers.set("Accept", "application/xml");
-
-            // String tdd = rt.postForObject(builder.build().encode().toUri(), new
-            // HttpEntity<>(ehr, headers),
-            // String.class);
-
             // XDS Envelope
 
             try (InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream("iti41.xml")) {
@@ -374,6 +349,20 @@ public final class OpenEhrObds {
                         new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".xml"));
                 writerXDS.write(content);
                 writerXDS.close();
+
+                // XDS Upload
+
+                RestTemplate rt = new RestTemplate();
+                UriComponentsBuilder builder = UriComponentsBuilder
+                        .fromUri(Settings.getXdsUrl());
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("Content-Type", "application/xml");
+                headers.set("Accept", "application/xml");
+
+                String xds = rt.postForObject(builder.build().encode().toUri(), new HttpEntity<>(content, headers),
+                        String.class);
+                Logger.debug(xds);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

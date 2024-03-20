@@ -16,6 +16,7 @@ public final class Settings {
     private static URI openEhrUrl;
     private static String openEhrUser;
     private static String openEhrPassword;
+    private static URI xdsUrl;
     private static String target;
     private static CxxMdrSettings cxxmdr;
     private static Map<String, Mapping> mapping;
@@ -57,6 +58,15 @@ public final class Settings {
     @JsonProperty("openEhrPassword")
     public void setOpenEhrPassword(String newOpenEhrPassword) {
         openEhrPassword = newOpenEhrPassword;
+    }
+
+    public static URI getXdsUrl() {
+        return xdsUrl;
+    }
+
+    @JsonProperty("xdsUrl")
+    public void setXdsUrl(URI newXdsUrl) {
+        xdsUrl = newXdsUrl;
     }
 
     public static String getTarget() {
