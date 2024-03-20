@@ -5,11 +5,15 @@ cxxmdr:
    basicUsername:
    basicPassword:
 fhirTsUrl:
+openEhrUrl:
+openEhrUser:
+openEhrPassword:
+target: raw
 mapping:
-  /Patient/Meldung/Tumorzuordnung:
-    source: 
+  /Patient:
+    source: obds-patient
     sourceVersion: 1
-    target: 
+    target: openehr-obds-patient
     targetVersion: 1
     split: false
 depthLimit: 4
