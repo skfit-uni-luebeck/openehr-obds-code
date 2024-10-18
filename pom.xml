@@ -52,7 +52,7 @@
         <dependency>
             <groupId>com.nedap.healthcare.archie</groupId>
             <artifactId>archie-all</artifactId>
-            <version>3.11.0</version>
+            <version>3.12.0</version>
         </dependency>
         <dependency>
             <groupId>org.ehrbase.openehr.sdk</groupId>
