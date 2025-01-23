@@ -12,6 +12,8 @@ import java.util.Map;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public final class Settings {
 
+    private static String kafkaTopic;
+    private static String kafkaServers;
     private static URL fhirTsUrl;
     private static URI openEhrUrl;
     private static String openEhrUser;
@@ -23,6 +25,24 @@ public final class Settings {
     private static int depthLimit;
 
     private Settings() {}
+
+    public static String getKafkaTopic() {
+        return kafkaTopic;
+    }
+
+    @JsonProperty("kafkaTopic")
+    public void setKakfaTopic(String newKafkaTopic) {
+        kafkaTopic = newKafkaTopic;
+    }
+
+    public static String getKafkaServers() {
+        return kafkaServers;
+    }
+
+    @JsonProperty("kafkaServers")
+    public void setKakfaServers(String newKafkaServers) {
+        kafkaServers = newKafkaServers;
+    }
 
     public static URL getFhirTsUrl() {
         return fhirTsUrl;

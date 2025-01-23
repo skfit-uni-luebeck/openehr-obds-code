@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -40,6 +42,19 @@ import javax.xml.bind.JAXBException;
 import javax.xml.namespace.QName;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.LongDeserializer;
+import org.apache.kafka.common.serialization.LongSerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.xmlbeans.XmlOptions;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
@@ -57,8 +72,11 @@ public final class OpenEhrObds {
 
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
+    private static final int KAFKA_POLL_DURATION = 10;
+    private static final int KAFKA_POLL_RECORDS = 5;
     private static Integer i = 0;
     private static DefaultRestClient openEhrClient;
+    private static XmlMapper xmlMapper = new XmlMapper();
 
     private OpenEhrObds() {
     }
@@ -71,6 +89,33 @@ public final class OpenEhrObds {
 
         ConfigurationLoader configLoader = new ConfigurationLoader();
         configLoader.loadConfiguration(settingsYaml, Settings.class);
+
+        // KAFKA PRODUCER
+
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                Settings.getKafkaServers());
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                LongSerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                StringSerializer.class.getName());
+        KafkaProducer<Long, String> kp = new KafkaProducer<>(props);
+
+        File inFile = new File("tod.xml");
+        long time = System.currentTimeMillis();
+
+        try {
+            final ProducerRecord<Long, String> record = new ProducerRecord<>(Settings.getKafkaTopic(), 0L,
+                    Files.readString(inFile.toPath()));
+
+            kp.send(record);
+
+        } finally {
+            kp.flush();
+            kp.close();
+        }
+
+        // END KAFKA PRODUCER
 
         FhirResolver.initialize();
         CxxMdrSettings mdrSettings = Settings.getCxxmdr();
@@ -120,20 +165,57 @@ public final class OpenEhrObds {
 
         });
 
-        XmlMapper xmlMapper = new XmlMapper();
-
         Logger.info("OpenEhrObds started!");
 
         // ToDo: Replace with Kafka consumer
 
+        Properties props2 = new Properties();
+        props2.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, Settings.getKafkaServers());
+        props2.put(ConsumerConfig.GROUP_ID_CONFIG, "obds");
+        props2.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class.getName());
+        props2.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        props2.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, KAFKA_POLL_RECORDS);
+        props2.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        props2.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+        Consumer<Long, String> consumer = new KafkaConsumer<>(props2);
+        consumer.subscribe(Collections.singletonList(Settings.getKafkaTopic()));
+
+        while (true) {
+            ConsumerRecords<Long, String> consumerRecords = consumer.poll(Duration.ofSeconds(KAFKA_POLL_DURATION));
+            // print each record.
+            consumerRecords.forEach(record -> {
+                System.out.println("Record Key " + record.key());
+                System.out.println("Record value " + record.value());
+                System.out.println("Record partition " + record.partition());
+                System.out.println("Record offset " + record.offset());
+
+                Map<String, Object> m = new LinkedHashMap<>();
+                try {
+                    walkXmlTree(xmlMapper.readValue(record.value(), new TypeReference<LinkedHashMap<String, Object>>() {
+                    }).entrySet(), 1, "", m);
+                } catch (JsonProcessingException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
+                Map<TopicPartition, OffsetAndMetadata> commitMap = new HashMap<>();
+                commitMap.put(new TopicPartition(record.topic(), record.partition()),
+                        new OffsetAndMetadata(record.offset() + 1));
+                consumer.commitSync(commitMap);
+
+            });
+
+        }
         // File f = new File("file_1705482004-clean.xml");
         // File f = new File("file_1705482019-clean.xml");
         // File f = new File("file_1705482057-clean.xml");
-        File f = new File("tod.xml");
+        // File f = new File("tod.xml");
 
-        Map<String, Object> m = new LinkedHashMap<>();
-        walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
-        }).entrySet(), 1, "", m);
+        // Map<String, Object> m = new LinkedHashMap<>();
+        // walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String,
+        // Object>>() {
+        // }).entrySet(), 1, "", m);
 
     }
 
