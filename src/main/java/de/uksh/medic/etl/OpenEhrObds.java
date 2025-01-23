@@ -40,6 +40,8 @@ import javax.xml.bind.JAXBException;
 import javax.xml.namespace.QName;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
+
+import org.apache.xmlbeans.XmlException;
 import org.apache.xmlbeans.XmlOptions;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
@@ -87,14 +89,28 @@ public final class OpenEhrObds {
 
         openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
 
+        URI finalEhrBaseUrl = ehrBaseUrl;
         Settings.getMapping().values().forEach(m -> {
             if (m.getTemplateId() != null) {
-                Optional<OPERATIONALTEMPLATE> oTemplate = openEhrClient.templateEndpoint()
-                        .findTemplate(m.getTemplateId());
-                assert oTemplate.isPresent();
+                OPERATIONALTEMPLATE template;
+                if (finalEhrBaseUrl != null) {
+                    Optional<OPERATIONALTEMPLATE> oTemplate = openEhrClient.templateEndpoint()
+                            .findTemplate(m.getTemplateId());
+                    assert oTemplate.isPresent();
+                    template = oTemplate.get();
+                } else {
+                    try {
+                        template = OPERATIONALTEMPLATE.Factory.parse(new File(m.getTemplateId() + ".opt"));
+                    } catch (XmlException e) {
+                        throw new RuntimeException(e);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
                 XmlOptions opts = new XmlOptions();
                 opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
-                PARSERS.put(m.getTemplateId(), new EHRParser(oTemplate.get().xmlText(opts)));
+                PARSERS.put(m.getTemplateId(), new EHRParser(template.xmlText(opts)));
             }
 
             if (m.getSource() == null) {
@@ -125,7 +141,7 @@ public final class OpenEhrObds {
         // File f = new File("file_1705482004-clean.xml");
         // File f = new File("file_1705482019-clean.xml");
         // File f = new File("file_1705482057-clean.xml");
-        File f = new File("tod.xml");
+        File f = new File("op.xml");
 
         Map<String, Object> m = new LinkedHashMap<>();
         walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
@@ -314,7 +330,7 @@ public final class OpenEhrObds {
                     "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
                             + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
             UUID ehrId = null;
-            if (ehrIds.getRows().size() == 0) {
+            if (ehrIds.getRows().isEmpty()) {
                 EhrStatus es = new EhrStatus();
                 es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
                 es.setName(new DvText("EHR status"));

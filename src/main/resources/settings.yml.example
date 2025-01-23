@@ -5,6 +5,10 @@ cxxmdr:
    basicUsername:
    basicPassword:
 fhirTsUrl:
+openEhrUrl:
+openEhrUser:
+openEhrPassword:
+target:
 mapping:
   /Patient/Meldung/Tumorzuordnung:
     source: 
@@ -12,4 +16,5 @@ mapping:
     target: 
     targetVersion: 1
     split: false
+    templateId:
 depthLimit: 4
