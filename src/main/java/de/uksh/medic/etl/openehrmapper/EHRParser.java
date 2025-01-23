@@ -56,9 +56,9 @@ public class EHRParser {
             throws ParserConfigurationException, SAXException, XPathExpressionException, IOException,
             JAXBException {
 
-        String pathContent = "/template/definition[rm_type_name = \"COMPOSITION\"]"
+        String pathContent = "//template/definition[rm_type_name = \"COMPOSITION\"]"
                 + "/attributes[rm_attribute_name=\"content\"]";
-        String pathContext = "/template/definition[rm_type_name = \"COMPOSITION\"]"
+        String pathContext = "//template/definition[rm_type_name = \"COMPOSITION\"]"
                 + "/attributes[rm_attribute_name=\"context\"]/children/attributes[rm_attribute_name=\"other_context\"]";
 
         XPathFactory xpf = XPathFactory.newInstance();
@@ -67,20 +67,20 @@ public class EHRParser {
         Composition composition = new Composition();
 
         composition.setArchetypeNodeId(
-                ((String) xp.evaluate("/template/definition/archetype_id", doc, XPathConstants.STRING))
+                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING))
                         .trim());
 
         composition.setNameAsString(
-                ((String) xp.evaluate("/template/definition/template_id", doc, XPathConstants.STRING))
+                ((String) xp.evaluate("//template/definition/template_id", doc, XPathConstants.STRING))
                         .trim());
 
         Archetyped archetypeDetails = new Archetyped();
         archetypeDetails.setArchetypeId(new ArchetypeID(
-                ((String) xp.evaluate("/template/definition/archetype_id", doc, XPathConstants.STRING))
+                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING))
                         .trim()));
 
         TemplateId templateId = new TemplateId();
-        templateId.setValue(((String) xp.evaluate("/template/template_id", doc, XPathConstants.STRING)).trim());
+        templateId.setValue(((String) xp.evaluate("//template/template_id", doc, XPathConstants.STRING)).trim());
         archetypeDetails.setTemplateId(templateId);
         archetypeDetails.setRmVersion("1.1.0");
         composition.setArchetypeDetails(archetypeDetails);
