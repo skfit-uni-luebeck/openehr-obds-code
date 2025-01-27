@@ -17,7 +17,9 @@ public final class Settings {
     private static String openEhrUser;
     private static String openEhrPassword;
     private static String target;
+    private static String mode;
     private static CxxMdrSettings cxxmdr;
+    private static KafkaSettings kafka;
     private static Map<String, Mapping> mapping;
     private static int depthLimit;
 
@@ -25,6 +27,14 @@ public final class Settings {
 
     public static URL getFhirTsUrl() {
         return fhirTsUrl;
+    }
+
+    public static String getMode() {
+        return mode;
+    }
+
+    public static void setMode(String mode) {
+        Settings.mode = mode;
     }
 
     @JsonProperty("fhirTsUrl")
@@ -75,6 +85,15 @@ public final class Settings {
     @JsonProperty("cxxmdr")
     public void setCxxMdrSettings(CxxMdrSettings newCxxMdr) {
         cxxmdr = newCxxMdr;
+    }
+
+    public static KafkaSettings getKafka() {
+        return kafka;
+    }
+
+    @JsonProperty("kafka")
+    public void setKafkaSettings(KafkaSettings newKafka) {
+        kafka = newKafka;
     }
 
     public static Map<String, Mapping> getMapping() {

@@ -1,3 +1,4 @@
+mode:
 cxxmdr:
    url:
    username:
@@ -8,6 +9,11 @@ fhirTsUrl:
 openEhrUrl:
 openEhrUser:
 openEhrPassword:
+kafka:
+  url:
+  group:
+  offset: earliest
+  topic:
 target:
 mapping:
   /Patient/Meldung/Tumorzuordnung:

@@ -2,6 +2,8 @@ package de.uksh.medic.etl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
@@ -31,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -40,6 +43,12 @@ import javax.xml.bind.JAXBException;
 import javax.xml.namespace.QName;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.xmlbeans.XmlException;
 import org.apache.xmlbeans.XmlOptions;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
@@ -131,26 +140,69 @@ public final class OpenEhrObds {
 
         });
 
-        XmlMapper xmlMapper = new XmlMapper();
+        ObjectMapper mapper;
+
+        if ("xml".equals(Settings.getMode())) {
+            mapper = new XmlMapper();
+        } else {
+            mapper = new JsonMapper();
+        }
 
         Logger.info("OpenEhrObds started!");
 
-        // ToDo: Replace with Kafka consumer
+        if (Settings.getKafka().getUrl().isEmpty()) {
+            Logger.info("Kafka URL not set, loading local file");
+            File f = new File("op.xml");
 
-        // File f = new File("file_1705482004-clean.xml");
-        // File f = new File("file_1705482019-clean.xml");
-        // File f = new File("file_1705482057-clean.xml");
-        File f = new File("op.xml");
+            Map<String, Object> m = new LinkedHashMap<>();
+            walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
+            }).entrySet(), 1, "", m);
+            System.exit(0);
+        }
 
-        Map<String, Object> m = new LinkedHashMap<>();
-        walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
-        }).entrySet(), 1, "", m);
+        Properties config = new Properties();
+        config.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, Settings.getKafka().getClientID());
+        config.setProperty(ConsumerConfig.GROUP_ID_CONFIG, Settings.getKafka().getGroup());
+        config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, Settings.getKafka().getUrl());
+        config.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, Settings.getKafka().getOffset());
+        config.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        config.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
 
+        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config)) {
+            final Thread mainThread = Thread.currentThread();
+
+            // adding the shutdown hook
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                public void run() {
+                    Logger.info("Shutdown detected, calling consumer.wakeup()...");
+                    consumer.wakeup();
+
+                    // join the main thread to allow the execution of the code in the main thread
+                    try {
+                        mainThread.join();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+            consumer.subscribe(Collections.singleton(Settings.getKafka().getTopic()));
+
+            while (true) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+
+                for (ConsumerRecord<String, String> record : records) {
+
+                }
+            }
+        } catch (WakeupException e) {
+            Logger.debug("Caught wake up exception.");
+        }
     }
 
     @SuppressWarnings({ "unchecked" })
-    public static void walkXmlTree(Set<Map.Entry<String, Object>> xmlSet, int depth, String path,
-            Map<String, Object> resMap) {
+    public static void walkXmlTree(Set<Entry<String, Object>> xmlSet, int depth, String path,
+                                   Map<String, Object> resMap) {
 
         if (depth > Settings.getDepthLimit()) {
             return;
@@ -181,7 +233,7 @@ public final class OpenEhrObds {
 
         }
 
-        for (Map.Entry<String, Object> entry : xmlSet) {
+        for (Entry<String, Object> entry : xmlSet) {
             String newPath = path + "/" + entry.getKey();
             int newDepth = depth + 1;
 
@@ -214,7 +266,7 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static void queryFhirTs(Mapping m, Map.Entry<String, Object> e) {
+    private static void queryFhirTs(Mapping m, Entry<String, Object> e) {
         if (e.getValue() == null) {
             return;
         }
@@ -284,7 +336,7 @@ public final class OpenEhrObds {
         }
     }
 
-    private static Map<String, Object> convertMdr(Set<Map.Entry<String, Object>> xmlSet, Mapping m) {
+    private static Map<String, Object> convertMdr(Set<Entry<String, Object>> xmlSet, Mapping m) {
         RelationConvert conv = new RelationConvert();
         conv.setSourceProfileCode(m.getSource());
         conv.setTargetProfileCode(m.getTarget());
