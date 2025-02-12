@@ -5,7 +5,7 @@ package de.uksh.medic.etl.settings;
  */
 public class KafkaSettings {
 
-    private String url;
+    private String url = "";
     private String username;
     private String password;
     private String group;

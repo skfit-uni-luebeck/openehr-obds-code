@@ -33,7 +33,8 @@ public final class Settings {
         return mode;
     }
 
-    public static void setMode(String mode) {
+    @JsonProperty("mode")
+    public void setMode(String mode) {
         Settings.mode = mode;
     }
 

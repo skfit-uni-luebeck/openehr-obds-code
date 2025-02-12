@@ -154,9 +154,8 @@ public final class OpenEhrObds {
             Logger.info("Kafka URL not set, loading local file");
             File f = new File("op.xml");
 
-            Map<String, Object> m = new LinkedHashMap<>();
             walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
-            }).entrySet(), 1, "", m);
+            }).entrySet(), 1, "", new LinkedHashMap<>());
             System.exit(0);
         }
 
@@ -172,19 +171,17 @@ public final class OpenEhrObds {
             final Thread mainThread = Thread.currentThread();
 
             // adding the shutdown hook
-            Runtime.getRuntime().addShutdownHook(new Thread() {
-                public void run() {
-                    Logger.info("Shutdown detected, calling consumer.wakeup()...");
-                    consumer.wakeup();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                Logger.info("Shutdown detected, calling consumer.wakeup()...");
+                consumer.wakeup();
 
-                    // join the main thread to allow the execution of the code in the main thread
-                    try {
-                        mainThread.join();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                // join the main thread to allow the execution of the code in the main thread
+                try {
+                    mainThread.join();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-            });
+            }));
 
             consumer.subscribe(Collections.singleton(Settings.getKafka().getTopic()));
 
@@ -200,10 +197,11 @@ public final class OpenEhrObds {
         }
     }
 
+
+
     @SuppressWarnings({ "unchecked" })
     public static void walkXmlTree(Set<Entry<String, Object>> xmlSet, int depth, String path,
                                    Map<String, Object> resMap) {
-
         if (depth > Settings.getDepthLimit()) {
             return;
         }
@@ -370,8 +368,7 @@ public final class OpenEhrObds {
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
             writer.write(ehr);
 
-        } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException
-                | JAXBException e) {
+        } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException | JAXBException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
