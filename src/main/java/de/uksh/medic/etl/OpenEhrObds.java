@@ -361,7 +361,7 @@ public final class OpenEhrObds {
 
         if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
             && "KDS_Biobank".equals(templateId)) {
-            deleteOpenEhrComposition();
+            //deleteOpenEhrComposition();
             return;
         } else {
             data.remove("requestMethod");
@@ -381,7 +381,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl().isEmpty()) {
             try (BufferedWriter writer = new BufferedWriter(
-                    new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
+                    new FileWriter("fileOutput/" + i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
                 writer.write(ehr);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -469,5 +469,6 @@ public final class OpenEhrObds {
                 return;
             case "xds":
                 return;
+        }
     }
 }
