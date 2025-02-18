@@ -200,9 +200,7 @@ public final class OpenEhrObds {
         }
     }
 
-
-
-    @SuppressWarnings({ "unchecked" })
+    @SuppressWarnings({"unchecked"})
     public static void walkXmlTree(Set<Entry<String, Object>> xmlSet, int depth, String path,
                                    Map<String, Object> resMap) {
         if (depth > Settings.getDepthLimit()) {
@@ -239,10 +237,10 @@ public final class OpenEhrObds {
             int newDepth = depth + 1;
 
             switch (entry.getValue()) {
-                case @SuppressWarnings("rawtypes") Map h -> {
+                case @SuppressWarnings("rawtypes")Map h -> {
                     walkXmlTree(h.entrySet(), newDepth, newPath, theMap);
                 }
-                case @SuppressWarnings("rawtypes") List a -> {
+                case @SuppressWarnings("rawtypes")List a -> {
                     for (Object b : a) {
                         System.out.println(entry.getKey());
                         walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
@@ -266,7 +264,7 @@ public final class OpenEhrObds {
         });
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private static void queryFhirTs(Mapping m, Entry<String, Object> e) {
         if (e.getValue() == null) {
             return;
@@ -307,7 +305,7 @@ public final class OpenEhrObds {
         return out;
     }
 
-    @SuppressWarnings({ "unchecked" })
+    @SuppressWarnings({"unchecked"})
     private static void splitMap(Object value, List<String> key, Map<String, Object> out) {
         if (key.size() > 1) {
             String k = key.removeFirst();
@@ -360,7 +358,7 @@ public final class OpenEhrObds {
         Composition composition = null;
 
         if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
-            && "KDS_Biobank".equals(templateId)) {
+                && "KDS_Biobank".equals(templateId)) {
             //deleteOpenEhrComposition();
             return;
         } else {
@@ -374,14 +372,16 @@ public final class OpenEhrObds {
             System.out.println("Finished JSON-Generation. Generating String.");
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
 
-        } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException | JAXBException e) {
+        } catch (XPathExpressionException | IOException | ParserConfigurationException
+                 | SAXException | JAXBException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
         if (Settings.getKafka().getUrl().isEmpty()) {
             try (BufferedWriter writer = new BufferedWriter(
-                    new FileWriter("fileOutput/" + i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
+                    new FileWriter("fileOutput/" + i++ + "_"
+                            + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
                 writer.write(ehr);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -391,8 +391,8 @@ public final class OpenEhrObds {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                        "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                                + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
+                    "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                            + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
                 UUID ehrId = null;
                 if (ehrIds.getRows().isEmpty()) {
                     EhrStatus es = new EhrStatus();
@@ -401,7 +401,8 @@ public final class OpenEhrObds {
                     es.setQueryable(true);
                     es.setModifiable(true);
                     es.setSubject(new PartySelf(new PartyRef(
-                            new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()), "DEMOGRAPHIC", "PERSON")));
+                            new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()),
+                            "DEMOGRAPHIC", "PERSON")));
                     ehrId = openEhrClient.ehrEndpoint().createEhr(es);
                 } else if (ehrIds.getRows().size() == 1) {
                     ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
@@ -456,6 +457,8 @@ public final class OpenEhrObds {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+                break;
+            default:
         }
     }
 
@@ -463,12 +466,13 @@ public final class OpenEhrObds {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                        "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                    "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
                                 + sampleId + "'"));
                 // feeder_audit.originating_system_item_ids?
                 return;
             case "xds":
                 return;
+            default:
         }
     }
 }

@@ -64,7 +64,7 @@ public class Generator {
     }
 
     public void processAttributeChildren(String path, String name, Object jsonmap,
-            Map<String, Object> map) {
+                                         Map<String, Object> map) {
         String newPath = path + "/children";
         if (!cacheNodeList.containsKey(newPath + "/rm_type_name")) {
             XPathExpression expr;
@@ -381,7 +381,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_CLUSTER(String path, String name, Object jsonmap,
-            Map<String, Object> map)
+                            Map<String, Object> map)
             throws Exception {
         if (!cache.containsKey(path + "/archetype_id")) {
             XPathExpression expr = XP.compile(path + "/archetype_id");
@@ -501,14 +501,14 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions
 
     public void gen_DV_BOOLEAN(String path, String name, Object jsonmap,
-            Map<String, Boolean> map) {
+                               Map<String, Boolean> map) {
         ((Element) jsonmap).setValue(new DvBoolean(map.get(name)));
     }
 
     // DV_STATE
 
     public void gen_DV_IDENTIFIER(String path, String name, Object jsonmap,
-            Map<String, Object> map) throws Exception {
+                                  Map<String, Object> map) throws Exception {
         DvIdentifier id = new DvIdentifier();
         id.setId(String.valueOf(map.get(name)));
         ((Element) jsonmap).setValue(id);
@@ -518,7 +518,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_2
 
     public void gen_DV_TEXT(String path, String name, Object jsonmap,
-            Map<String, String> map)
+                            Map<String, String> map)
             throws Exception {
         if (!map.containsKey(name)) {
             return;
@@ -531,7 +531,7 @@ public class Generator {
     // CODE_PHRASE
 
     public void gen_DV_CODED_TEXT(String path, String name, Object jsonmap,
-            Map<String, Object> map) throws Exception {
+                                  Map<String, Object> map) throws Exception {
 
         DvCodedText ct = new DvCodedText();
         switch (map.get(name)) {
@@ -591,7 +591,7 @@ public class Generator {
     // REFERENCE_RANGE
 
     public void gen_DV_ORDINAL(String path, String name, Object jsonmap,
-            Map<String, String> map) throws Exception {
+                               Map<String, String> map) throws Exception {
         DvOrdinal dvo = new DvOrdinal();
         Long value = Long.valueOf(map.get(name));
         dvo.setValue(value);
@@ -608,12 +608,12 @@ public class Generator {
     // DV_AMOUNT
 
     public void gen_DV_QUANTITY(String path, String name, Object jsonmap,
-            Map<String, String> map) {
+                                Map<String, String> map) {
         ((Element) jsonmap).setValue(new DvQuantity("1", Double.valueOf(map.get(name)), 1L));
     }
 
     public void gen_DV_COUNT(String path, String name, Object jsonmap,
-            Map<String, Long> map) {
+                             Map<String, Long> map) {
         ((Element) jsonmap).setValue(new DvCount(map.get(name)));
     }
 
@@ -627,14 +627,14 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_4
 
     public void gen_DV_DATE(String path, String name, Object jsonmap,
-            Map<String, String> map) {
+                            Map<String, String> map) {
         ((Element) jsonmap).setValue(new DvDate(map.get(name)));
     }
 
     // DV_TIME
 
     public void gen_DV_DATE_TIME(String path, String name, Object jsonmap,
-            Map<String, String> map) {
+                                 Map<String, String> map) {
         ((Element) jsonmap).setValue(new DvDateTime(map.get(name)));
     }
 
@@ -658,7 +658,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_7
 
     public void gen_DV_URI(String path, String name, Object jsonmap,
-            Map<String, Object> map)
+                           Map<String, Object> map)
             throws Exception {
         ((Element) jsonmap).setValue(new DvURI(String.valueOf(map.get(name))));
     }
@@ -707,13 +707,14 @@ public class Generator {
     private String getLocalTerminologyTerm(String archetype, String nodeId, String code) throws Exception {
         String newPath = "//archetype_id[value/text()=\"" + archetype + "\"]/../term_definitions[contains(@code, \"::"
                 + code + "\")]/items/text()";
-        String terminologyId = "//node_id[text()=\"" + nodeId + "\"]/../descendant::children[./code_list=\"" + code + "\"]/terminology_id/value/text()";
+        String terminologyId = "//node_id[text()=\"" + nodeId + "\"]/../descendant::children[./code_list=\""
+                + code + "\"]/terminology_id/value/text()";
         if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
             XPathExpression expr2 = XP.compile(terminologyId);
-            cache.put(newPath, expr2.evaluate(opt, XPathConstants.STRING) + "::" +
-                    ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
-                    .replaceAll("\\n", " "));
+            cache.put(newPath, expr2.evaluate(opt, XPathConstants.STRING) + "::"
+                    + ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
+                            .replaceAll("\\n", " "));
         }
         return cache.get(newPath);
     }
@@ -798,7 +799,7 @@ public class Generator {
         return defaults;
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private static void deepMerge(Map<String, Object> map1, Map<String, Object> map2) {
         for (String key : map2.keySet()) {
             Object value2 = map2.get(key);
@@ -817,7 +818,7 @@ public class Generator {
         }
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private static List merge(List list1, List list2) {
         list2.removeAll(list1);
         list1.addAll(list2);
