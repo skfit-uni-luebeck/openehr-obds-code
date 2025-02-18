@@ -61,6 +61,7 @@ import org.xml.sax.SAXException;
 
 public final class OpenEhrObds {
 
+    private static final int POLL_DURATION = 100;
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
@@ -152,7 +153,8 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl().isEmpty()) {
             Logger.info("Kafka URL not set, loading local file");
-            File f = new File("op.xml");
+            File f = new File("bundle.json");
+            //File f = new File("op.xml");
 
             walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
             }).entrySet(), 1, "", new LinkedHashMap<>());
@@ -186,10 +188,11 @@ public final class OpenEhrObds {
             consumer.subscribe(Collections.singleton(Settings.getKafka().getTopic()));
 
             while (true) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(POLL_DURATION));
 
                 for (ConsumerRecord<String, String> record : records) {
-
+                    walkXmlTree(mapper.readValue(record.value(), new TypeReference<LinkedHashMap<String, Object>>() {
+                    }).entrySet(), 1, "", new LinkedHashMap<>());
                 }
             }
         } catch (WakeupException e) {
@@ -285,7 +288,7 @@ public final class OpenEhrObds {
                     };
                     listed.add(FhirResolver.lookUp(fa.getSystem(), version, code));
                 } else if (fa.getConceptMap() != null) {
-                    listed.add(FhirResolver.conceptMap(fa.getConceptMap(), fa.getId(), fa.getSource(),
+                    listed.add(FhirResolver.conceptMap(fa.getConceptMap(), fa.getSystem(), fa.getSource(),
                             fa.getTarget(), code));
                 }
             } else {
@@ -353,95 +356,118 @@ public final class OpenEhrObds {
 
     @SuppressWarnings("unchecked")
     private static void buildOpenEhrComposition(String templateId, Map<String, Object> data) {
-
         String ehr = "";
         Composition composition = null;
 
-        try (BufferedWriter writer = new BufferedWriter(
-                new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
+        if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
+            && "KDS_Biobank".equals(templateId)) {
+            deleteOpenEhrComposition();
+            return;
+        } else {
+            data.remove("requestMethod");
+        }
 
+        try {
             // Write JSON to file
             composition = PARSERS.get(templateId).build(data);
 
             System.out.println("Finished JSON-Generation. Generating String.");
-
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
-            writer.write(ehr);
 
         } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException | JAXBException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
-        if ("raw".equals(Settings.getTarget())) {
-            QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                    "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                            + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
-            UUID ehrId = null;
-            if (ehrIds.getRows().isEmpty()) {
-                EhrStatus es = new EhrStatus();
-                es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
-                es.setName(new DvText("EHR status"));
-                es.setQueryable(true);
-                es.setModifiable(true);
-                es.setSubject(new PartySelf(new PartyRef(
-                        new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()), "DEMOGRAPHIC", "PERSON")));
-                ehrId = openEhrClient.ehrEndpoint().createEhr(es);
-            } else if (ehrIds.getRows().size() == 1) {
-                ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
-            }
-            openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
-        }
-
-        if ("xds".equals(Settings.getTarget())) {
-            // // create flat json
-            // FlatJsonMarshaller fjm = new FlatJsonMarshaller();
-            // ehr = fjm.toFlatJson(composition, template);
-
-            // // Convert to TDD
-
-            // RestTemplate rt = new RestTemplate();
-            // if (Settings.getOpenEhrUser() != null || Settings.getOpenEhrPassword() !=
-            // null) {
-            // rt.getInterceptors().add(
-            // new BasicAuthenticationInterceptor(Settings.getOpenEhrUser(),
-            // Settings.getOpenEhrPassword()));
-            // }
-            // MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            // form.set("templateId", templateId);
-            // form.set("format", "FLAT");
-            // UriComponentsBuilder builder = UriComponentsBuilder
-            // .fromHttpUrl(Settings.getOpenEhrUrl() + "rest/v1/composition/convert/tdd");
-            // builder.queryParams(form);
-
-            // HttpHeaders headers = new HttpHeaders();
-            // headers.set("Content-Type", "application/json");
-            // headers.set("Accept", "application/xml");
-
-            // String tdd = rt.postForObject(builder.build().encode().toUri(), new
-            // HttpEntity<>(ehr, headers),
-            // String.class);
-
-            // XDS Envelope
-
-            try (InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream("iti41.xml")) {
-                assert is != null;
-                String content = new String(is.readAllBytes());
-                content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).getFirst());
-                content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(ehr.getBytes())));
-                content = content.replace("UUID1", UUID.randomUUID().toString());
-                content = content.replace("UUID2", UUID.randomUUID().toString());
-                content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));
-                content = content.replace("DATETIME",
-                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-                BufferedWriter writerXDS = new BufferedWriter(
-                        new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".xml"));
-                writerXDS.write(content);
-                writerXDS.close();
+        if (Settings.getKafka().getUrl().isEmpty()) {
+            try (BufferedWriter writer = new BufferedWriter(
+                    new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
+                writer.write(ehr);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
+
+        switch (Settings.getTarget()) {
+            case "raw":
+                QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                        "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                                + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
+                UUID ehrId = null;
+                if (ehrIds.getRows().isEmpty()) {
+                    EhrStatus es = new EhrStatus();
+                    es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
+                    es.setName(new DvText("EHR status"));
+                    es.setQueryable(true);
+                    es.setModifiable(true);
+                    es.setSubject(new PartySelf(new PartyRef(
+                            new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()), "DEMOGRAPHIC", "PERSON")));
+                    ehrId = openEhrClient.ehrEndpoint().createEhr(es);
+                } else if (ehrIds.getRows().size() == 1) {
+                    ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+                }
+                openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
+                break;
+            case "xds":
+                // // create flat json
+                // FlatJsonMarshaller fjm = new FlatJsonMarshaller();
+                // ehr = fjm.toFlatJson(composition, template);
+
+                // // Convert to TDD
+
+                // RestTemplate rt = new RestTemplate();
+                // if (Settings.getOpenEhrUser() != null || Settings.getOpenEhrPassword() !=
+                // null) {
+                // rt.getInterceptors().add(
+                // new BasicAuthenticationInterceptor(Settings.getOpenEhrUser(),
+                // Settings.getOpenEhrPassword()));
+                // }
+                // MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+                // form.set("templateId", templateId);
+                // form.set("format", "FLAT");
+                // UriComponentsBuilder builder = UriComponentsBuilder
+                // .fromHttpUrl(Settings.getOpenEhrUrl() + "rest/v1/composition/convert/tdd");
+                // builder.queryParams(form);
+
+                // HttpHeaders headers = new HttpHeaders();
+                // headers.set("Content-Type", "application/json");
+                // headers.set("Accept", "application/xml");
+
+                // String tdd = rt.postForObject(builder.build().encode().toUri(), new
+                // HttpEntity<>(ehr, headers),
+                // String.class);
+
+                // XDS Envelope
+
+                try (InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream("iti41.xml")) {
+                    assert is != null;
+                    String content = new String(is.readAllBytes());
+                    content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).getFirst());
+                    content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(ehr.getBytes())));
+                    content = content.replace("UUID1", UUID.randomUUID().toString());
+                    content = content.replace("UUID2", UUID.randomUUID().toString());
+                    content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));
+                    content = content.replace("DATETIME",
+                            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+                    BufferedWriter writerXDS = new BufferedWriter(
+                            new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".xml"));
+                    writerXDS.write(content);
+                    writerXDS.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+        }
     }
 
+    private static void deleteOpenEhrComposition(String sampleId) {
+        switch (Settings.getTarget()) {
+            case "raw":
+                QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                        "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                                + sampleId + "'"));
+                // feeder_audit.originating_system_item_ids?
+                return;
+            case "xds":
+                return;
+    }
 }

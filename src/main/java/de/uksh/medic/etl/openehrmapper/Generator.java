@@ -83,6 +83,10 @@ public class Generator {
                 return;
             }
             String type = "gen_" + children.item(i).getFirstChild().getTextContent();
+            if ("gen_STRING".equals(type)) {
+                System.out.print("STRING");
+                return;
+            }
             type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "");
             Method met;
             try {
@@ -197,7 +201,11 @@ public class Generator {
         String label = getLabel(getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
-        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+        if (!map.containsKey(paramName)) {
+            return;
+        }
+
+        if (map.get(paramName) instanceof List) {
             l = (List<Map<String, Object>>) map.get(paramName);
         } else {
             l = List.of((Map<String, Object>) map.get(paramName));
@@ -529,16 +537,15 @@ public class Generator {
         switch (map.get(name)) {
             case Coding coding -> {
                 ct.setDefiningCode(new CodePhrase(
-                        new TerminologyId("terminology://fhir.hl7.org//ValueSet/$expand?url=" + coding.getSystem(),
-                                coding.getVersion()),
+                        new TerminologyId(coding.getSystem(), coding.getVersion()),
                         coding.getCode(), coding.getDisplay()));
                 ct.setValue(coding.getDisplay());
                 ((Element) jsonmap).setValue(ct);
             }
             case String s -> {
-                String display = getLocalTerminologyTerm((String) map.get("name"), s);
+                String display = getLocalTerminologyTerm((String) map.get("name"), name, s);
                 switch (display) {
-                    case "" -> {
+                    case "::" -> {
                         String local = getLocalTerm(path, s);
                         ct.setDefiningCode(new CodePhrase(
                                 new TerminologyId("local"),
@@ -547,9 +554,9 @@ public class Generator {
                     }
                     default -> {
                         ct.setDefiningCode(new CodePhrase(
-                                new TerminologyId("local_terms"),
-                                s, display));
-                        ct.setValue(display);
+                                new TerminologyId(display.split("::")[0]),
+                                s, display.split("::")[1]));
+                        ct.setValue(display.split("::")[1]);
                     }
                 }
 
@@ -697,12 +704,15 @@ public class Generator {
         return cache.get(newPath);
     }
 
-    private String getLocalTerminologyTerm(String archetype, String code) throws Exception {
-        String newPath = "//archetype_id[value/text()=\"" + archetype + "\"]/../term_definitions[@code=\"local_terms::"
-                + code + "\"]/items/text()";
+    private String getLocalTerminologyTerm(String archetype, String nodeId, String code) throws Exception {
+        String newPath = "//archetype_id[value/text()=\"" + archetype + "\"]/../term_definitions[contains(@code, \"::"
+                + code + "\")]/items/text()";
+        String terminologyId = "//node_id[text()=\"" + nodeId + "\"]/../descendant::children[./code_list=\"" + code + "\"]/terminology_id/value/text()";
         if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            cache.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
+            XPathExpression expr2 = XP.compile(terminologyId);
+            cache.put(newPath, expr2.evaluate(opt, XPathConstants.STRING) + "::" +
+                    ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
                     .replaceAll("\\n", " "));
         }
         return cache.get(newPath);

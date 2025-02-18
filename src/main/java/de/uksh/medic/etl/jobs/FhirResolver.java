@@ -29,17 +29,15 @@ public final class FhirResolver {
         }
     }
 
-    public static Coding conceptMap(URI conceptMapUri, String conceptMapId, URI source, URI target, String input) {
+    public static Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
         Parameters params = new Parameters();
-        params.addParameter("system", new UriType(source));
+        params.addParameter("system", new UriType(system));
         params.addParameter("source", new UriType(source));
         params.addParameter("target", new UriType(target));
-        params.addParameter("conceptMap",
-                new UriType(conceptMapUri));
         params.addParameter("code", input);
         try {
             Parameters result = terminologyClient.operation()
-                    .onInstance("ConceptMap/" + conceptMapId)
+                    .onType("ConceptMap")
                     .named("translate").withParameters(params).execute();
 
             for (ParametersParameterComponent p : result.getParameter()) {
