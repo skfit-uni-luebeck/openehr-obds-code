@@ -11,6 +11,7 @@ import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.ehr.EhrStatus;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.HierObjectId;
+import com.nedap.archie.rm.support.identification.ObjectVersionId;
 import com.nedap.archie.rm.support.identification.PartyRef;
 import de.uksh.medic.etl.jobs.FhirResolver;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrAttributes;
@@ -110,9 +111,7 @@ public final class OpenEhrObds {
                 } else {
                     try {
                         template = OPERATIONALTEMPLATE.Factory.parse(new File(m.getTemplateId() + ".opt"));
-                    } catch (XmlException e) {
-                        throw new RuntimeException(e);
-                    } catch (IOException e) {
+                    } catch (XmlException | IOException e) {
                         throw new RuntimeException(e);
                     }
                 }
@@ -134,8 +133,7 @@ public final class OpenEhrObds {
                     FHIR_ATTRIBUTES.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
                             CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "fhir", it.getId()));
                 } catch (URISyntaxException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    Logger.error(e);
                 }
             });
 
@@ -152,7 +150,7 @@ public final class OpenEhrObds {
         Logger.info("OpenEhrObds started!");
 
         if (Settings.getKafka().getUrl().isEmpty()) {
-            Logger.info("Kafka URL not set, loading local file");
+            Logger.debug("Kafka URL not set, loading local file");
             File f = new File("bundle.json");
             //File f = new File("op.xml");
 
@@ -181,7 +179,7 @@ public final class OpenEhrObds {
                 try {
                     mainThread.join();
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    Logger.error(e);
                 }
             }));
 
@@ -213,7 +211,6 @@ public final class OpenEhrObds {
         Map<String, Object> theMap = resMap;
 
         if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSource() != null) {
-
             Mapping m = Settings.getMapping().get(path);
 
             Map<String, Object> mapped = convertMdr(xmlSet, m);
@@ -346,8 +343,7 @@ public final class OpenEhrObds {
         try {
             return CxxMdrConvert.convert(Settings.getCxxmdr(), conv).getValues();
         } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            Logger.error(e);
         }
         return null;
     }
@@ -369,13 +365,12 @@ public final class OpenEhrObds {
             // Write JSON to file
             composition = PARSERS.get(templateId).build(data);
 
-            System.out.println("Finished JSON-Generation. Generating String.");
+            Logger.debug("Finished JSON-Generation. Generating String.");
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
 
         } catch (XPathExpressionException | IOException | ParserConfigurationException
                  | SAXException | JAXBException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            Logger.error(e);
         }
 
         if (Settings.getKafka().getUrl().isEmpty()) {
@@ -466,9 +461,26 @@ public final class OpenEhrObds {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                    "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                                + sampleId + "'"));
-                // feeder_audit.originating_system_item_ids?
+                    "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
+                            + "FROM EHR e "
+                            + "CONTAINS COMPOSITION c#KDS_Biobank "
+                            + "WHERE c/system_id = '" + Settings.getSystemId() + "'"
+                            + "AND c/id = '" + sampleId + "'"));
+                if (ehrIds.getRows().isEmpty()) {
+                    Logger.info("Nothing to delete for ID: {} from system: {}", sampleId, Settings.getSystemId());
+                    return;
+                }
+
+                if (ehrIds.getRows().size() > 1) {
+                    Logger.info("Found more than one composition for ID: {} from system: {}! This should not happen!",
+                            sampleId, Settings.getSystemId());
+                    return;
+                }
+
+                UUID ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+                ObjectVersionId versionId = new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast());
+                Logger.info("Deleting composition {} from ehr {}", versionId, ehrId);
+                openEhrClient.compositionEndpoint(ehrId).delete(versionId);
                 return;
             case "xds":
                 return;

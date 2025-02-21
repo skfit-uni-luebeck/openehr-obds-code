@@ -22,6 +22,7 @@ public final class Settings {
     private static KafkaSettings kafka;
     private static Map<String, Mapping> mapping;
     private static int depthLimit;
+    private static String systemId;
 
     private Settings() {}
 
@@ -31,6 +32,15 @@ public final class Settings {
 
     public static String getMode() {
         return mode;
+    }
+
+    public static String getSystemId() {
+        return systemId;
+    }
+
+    @JsonProperty("systemId")
+    public void setSystemId(String systemId) {
+        Settings.systemId = systemId;
     }
 
     @JsonProperty("mode")

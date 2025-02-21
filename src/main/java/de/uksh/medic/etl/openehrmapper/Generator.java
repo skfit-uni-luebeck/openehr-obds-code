@@ -45,6 +45,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import org.hl7.fhir.r4.model.Coding;
+import org.tinylog.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
@@ -72,19 +73,18 @@ public class Generator {
                 expr = XP.compile(newPath + "/rm_type_name");
                 cacheNodeList.put(newPath + "/rm_type_name", (NodeList) expr.evaluate(opt, XPathConstants.NODESET));
             } catch (XPathExpressionException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                Logger.error(e);
             }
         }
         NodeList children = cacheNodeList.get(newPath + "/rm_type_name");
         for (int i = 0; i < children.getLength(); i++) {
             if (children.item(i) == null || children.item(i).getFirstChild() == null || map == null) {
-                System.out.print("null");
+                Logger.debug("Encountered null children");
                 return;
             }
             String type = "gen_" + children.item(i).getFirstChild().getTextContent();
             if ("gen_STRING".equals(type)) {
-                System.out.print("STRING");
+                Logger.debug("Filtered out gen_STRING!");
                 return;
             }
             type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "");
@@ -94,8 +94,7 @@ public class Generator {
                         Map.class);
                 met.invoke(this, newPath + "[" + (i + 1) + "]", name, jsonmap, map);
             } catch (NoSuchMethodException | SecurityException | IllegalAccessException | InvocationTargetException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                Logger.error(e);
             }
         }
     }
@@ -787,8 +786,7 @@ public class Generator {
                 current.put(last, ls);
             }
         } catch (XPathExpressionException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            Logger.error(e);
         }
         return defaults;
     }
