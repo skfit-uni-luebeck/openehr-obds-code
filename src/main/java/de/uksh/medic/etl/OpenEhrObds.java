@@ -355,7 +355,7 @@ public final class OpenEhrObds {
 
         if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
                 && "KDS_Biobank".equals(templateId)) {
-            //deleteOpenEhrComposition();
+            deleteOpenEhrComposition(((List<String>) data.get("cxxId")).getFirst());
             return;
         } else {
             data.remove("requestMethod");
