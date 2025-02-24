@@ -58,10 +58,6 @@ public class Generator {
 
     public Generator(Document opt) {
         this.opt = opt;
-        generateCache();
-    }
-
-    private void generateCache() {
     }
 
     public void processAttributeChildren(String path, String name, Object jsonmap,
@@ -182,7 +178,7 @@ public class Generator {
             observation.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
             observation.setSubject(new PartySelf());
 
-            History<ItemStructure> history = new History<ItemStructure>();
+            History<ItemStructure> history = new History<>();
             processAttributeChildren(oap, paramName, history, le);
             observation.setData(history);
             if (oa) {
@@ -370,7 +366,7 @@ public class Generator {
         ItemTree itemTree = (ItemTree) jsonmap;
         itemTree.setArchetypeNodeId(nodeId);
         itemTree.setNameAsString("data"); // fix name
-        ArrayList<Item> items = new ArrayList<Item>();
+        ArrayList<Item> items = new ArrayList<>();
         itemTree.setItems(items);
         processAttributeChildren(newPath, name, items, map);
     }
@@ -390,7 +386,7 @@ public class Generator {
         String cAID = cache.get(path + "/archetype_id");
         String paramName = !"".equals(cAID) ? cAID : name;
         String nodeId = getNodeId(path);
-        Boolean isSlot = ((String) XP.evaluate(path + "/@type", opt, XPathConstants.STRING)).equals("C_ARCHETYPE_ROOT");
+        boolean isSlot = XP.evaluate(path + "/@type", opt, XPathConstants.STRING).equals("C_ARCHETYPE_ROOT");
         String aNodeId = isSlot ? paramName : nodeId;
         String newPath = path + "/attributes";
         String code = !"".equals(paramName) && !name.equals(paramName) ? paramName : nodeId;
@@ -411,7 +407,7 @@ public class Generator {
             Cluster cluster = new Cluster();
             cluster.setArchetypeNodeId(aNodeId);
             cluster.setNameAsString(label);
-            ArrayList<Item> items = new ArrayList<Item>();
+            ArrayList<Item> items = new ArrayList<>();
             processAttributeChildren(newPath, paramName, items, le);
             cluster.setItems(items);
             ((ArrayList<Object>) jsonmap).add(cluster);
@@ -469,7 +465,7 @@ public class Generator {
 
         history.setNameAsString(label);
 
-        history.setOrigin(new DvDateTime((String) ((List<String>) map.get("events_time")).getFirst()));
+        history.setOrigin(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
 
         processAttributeChildren(newPath, nodeId, history, map);
     }
@@ -480,12 +476,12 @@ public class Generator {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
         String newPath = path + "/attributes";
-        Event<ItemStructure> events = new PointEvent<ItemStructure>();
+        Event<ItemStructure> events = new PointEvent<>();
         events.setArchetypeNodeId(nodeId);
 
         events.setNameAsString(label);
 
-        events.setTime(new DvDateTime((String) ((List<String>) map.get("events_time")).getFirst()));
+        events.setTime(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
         ItemTree itemTree = new ItemTree();
         processAttributeChildren(newPath, nodeId, itemTree, map);
         events.setData(itemTree);
@@ -507,7 +503,7 @@ public class Generator {
     // DV_STATE
 
     public void gen_DV_IDENTIFIER(String path, String name, Object jsonmap,
-                                  Map<String, Object> map) throws Exception {
+                                  Map<String, Object> map) {
         DvIdentifier id = new DvIdentifier();
         id.setId(String.valueOf(map.get(name)));
         ((Element) jsonmap).setValue(id);
@@ -517,8 +513,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_2
 
     public void gen_DV_TEXT(String path, String name, Object jsonmap,
-                            Map<String, String> map)
-            throws Exception {
+                            Map<String, String> map) {
         if (!map.containsKey(name)) {
             return;
         }
@@ -543,20 +538,17 @@ public class Generator {
             }
             case String s -> {
                 String display = getLocalTerminologyTerm((String) map.get("name"), name, s);
-                switch (display) {
-                    case "::" -> {
-                        String local = getLocalTerm(path, s);
-                        ct.setDefiningCode(new CodePhrase(
-                                new TerminologyId("local"),
-                                local, s));
-                        ct.setValue(s);
-                    }
-                    default -> {
-                        ct.setDefiningCode(new CodePhrase(
-                                new TerminologyId(display.split("::")[0]),
-                                s, display.split("::")[1]));
-                        ct.setValue(display.split("::")[1]);
-                    }
+                if ("::".equals(display)) {
+                    String local = getLocalTerm(path, s);
+                    ct.setDefiningCode(new CodePhrase(
+                            new TerminologyId("local"),
+                            local, s));
+                    ct.setValue(s);
+                } else {
+                    ct.setDefiningCode(new CodePhrase(
+                            new TerminologyId(display.split("::")[0]),
+                            s, display.split("::")[1]));
+                    ct.setValue(display.split("::")[1]);
                 }
 
                 ((Element) jsonmap).setValue(ct);
@@ -657,8 +649,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_7
 
     public void gen_DV_URI(String path, String name, Object jsonmap,
-                           Map<String, Object> map)
-            throws Exception {
+                           Map<String, Object> map) {
         ((Element) jsonmap).setValue(new DvURI(String.valueOf(map.get(name))));
     }
 

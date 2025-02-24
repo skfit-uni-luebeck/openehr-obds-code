@@ -31,7 +31,7 @@ public final class CxxMdrLogin {
         form.set("scope", "anyscope");
         form.set("username", mdr.getUsername());
         form.set("password", mdr.getPassword());
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(mdr.getUrl() + "/oauth/token");
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(mdr.getUrl() + "/oauth/token");
         builder.queryParams(form);
         MdrToken token = rt.postForObject(builder.build().encode().toUri(), null, MdrToken.class);
         if (token != null) {

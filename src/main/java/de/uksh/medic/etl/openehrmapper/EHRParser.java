@@ -21,7 +21,6 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.xml.bind.JAXBException;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
@@ -51,8 +50,7 @@ public class EHRParser {
     }
 
     public Composition build(Map<String, Object> map)
-            throws ParserConfigurationException, SAXException, XPathExpressionException, IOException,
-            JAXBException {
+            throws XPathExpressionException {
 
         String pathContent = "//template/definition[rm_type_name = \"COMPOSITION\"]"
                 + "/attributes[rm_attribute_name=\"content\"]";

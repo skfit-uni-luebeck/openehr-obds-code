@@ -40,16 +40,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
-import javax.xml.bind.JAXBException;
 import javax.xml.namespace.QName;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.xmlbeans.XmlException;
 import org.apache.xmlbeans.XmlOptions;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
@@ -58,11 +60,10 @@ import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
 import org.tinylog.Logger;
-import org.xml.sax.SAXException;
 
 public final class OpenEhrObds {
 
-    private static final int POLL_DURATION = 100;
+    private static final int POLL_DURATION = 1000;
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
@@ -159,15 +160,8 @@ public final class OpenEhrObds {
             System.exit(0);
         }
 
-        Properties config = new Properties();
-        config.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, Settings.getKafka().getClientID());
-        config.setProperty(ConsumerConfig.GROUP_ID_CONFIG, Settings.getKafka().getGroup());
-        config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, Settings.getKafka().getUrl());
-        config.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, Settings.getKafka().getOffset());
-        config.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        config.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-
-        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config)) {
+        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(getConsumerProperties());
+             KafkaProducer<String, String> producer = new KafkaProducer<>(getProducerProperties())) {
             final Thread mainThread = Thread.currentThread();
 
             // adding the shutdown hook
@@ -183,19 +177,45 @@ public final class OpenEhrObds {
                 }
             }));
 
-            consumer.subscribe(Collections.singleton(Settings.getKafka().getTopic()));
+            consumer.subscribe(Collections.singleton(Settings.getKafka().getReadTopic()));
 
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(POLL_DURATION));
 
                 for (ConsumerRecord<String, String> record : records) {
-                    walkXmlTree(mapper.readValue(record.value(), new TypeReference<LinkedHashMap<String, Object>>() {
-                    }).entrySet(), 1, "", new LinkedHashMap<>());
+                    try {
+                        walkXmlTree(mapper.readValue(record.value(),
+                                new TypeReference<LinkedHashMap<String, Object>>() {}).entrySet(), 1, "",
+                                    new LinkedHashMap<>());
+                    } catch (ProcessingException e) {
+                        producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
+                        producer.flush();
+                    }
                 }
             }
         } catch (WakeupException e) {
             Logger.debug("Caught wake up exception.");
         }
+    }
+
+    private static Properties getConsumerProperties() {
+        Properties consumerConfig = new Properties();
+        consumerConfig.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, Settings.getKafka().getClientID());
+        consumerConfig.setProperty(ConsumerConfig.GROUP_ID_CONFIG, Settings.getKafka().getGroup());
+        consumerConfig.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, Settings.getKafka().getUrl());
+        consumerConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, Settings.getKafka().getOffset());
+        consumerConfig.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        consumerConfig.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        return consumerConfig;
+    }
+
+    private static Properties getProducerProperties() {
+        Properties producerConfig = new Properties();
+        producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, Settings.getKafka().getClientID());
+        producerConfig.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, Settings.getKafka().getUrl());
+        producerConfig.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        return producerConfig;
     }
 
     @SuppressWarnings({"unchecked"})
@@ -226,7 +246,6 @@ public final class OpenEhrObds {
             if (split) {
                 buildOpenEhrComposition(m.getTemplateId(), result);
             }
-
         }
 
         for (Entry<String, Object> entry : xmlSet) {
@@ -239,7 +258,7 @@ public final class OpenEhrObds {
                 }
                 case @SuppressWarnings("rawtypes")List a -> {
                     for (Object b : a) {
-                        System.out.println(entry.getKey());
+                        Logger.debug(entry.getKey());
                         walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
                     }
                 }
@@ -277,7 +296,7 @@ public final class OpenEhrObds {
                 };
                 if (fa.getConceptMap() == null) {
                     String version = switch (o) {
-                        case String c -> fa.getVersion();
+                        case String ignored -> fa.getVersion();
                         case Map map -> ((Map<String, String>) map).get("version");
                         default -> null;
                     };
@@ -332,7 +351,8 @@ public final class OpenEhrObds {
         }
     }
 
-    private static Map<String, Object> convertMdr(Set<Entry<String, Object>> xmlSet, Mapping m) {
+    private static Map<String, Object> convertMdr(Set<Entry<String, Object>> xmlSet, Mapping m)
+            throws ProcessingException {
         RelationConvert conv = new RelationConvert();
         conv.setSourceProfileCode(m.getSource());
         conv.setTargetProfileCode(m.getTarget());
@@ -344,14 +364,15 @@ public final class OpenEhrObds {
             return CxxMdrConvert.convert(Settings.getCxxmdr(), conv).getValues();
         } catch (JsonProcessingException e) {
             Logger.error(e);
+            throw new ProcessingException(e);
         }
-        return null;
     }
 
     @SuppressWarnings("unchecked")
-    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data) {
-        String ehr = "";
-        Composition composition = null;
+    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data)
+            throws ProcessingException {
+        String ehr;
+        Composition composition;
 
         if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
                 && "KDS_Biobank".equals(templateId)) {
@@ -368,9 +389,9 @@ public final class OpenEhrObds {
             Logger.debug("Finished JSON-Generation. Generating String.");
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
 
-        } catch (XPathExpressionException | IOException | ParserConfigurationException
-                 | SAXException | JAXBException e) {
+        } catch (XPathExpressionException | JsonProcessingException e) {
             Logger.error(e);
+            throw new ProcessingException(e);
         }
 
         if (Settings.getKafka().getUrl().isEmpty()) {
@@ -379,16 +400,17 @@ public final class OpenEhrObds {
                             + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
                 writer.write(ehr);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new ProcessingException(e);
             }
         }
 
         switch (Settings.getTarget()) {
             case "raw":
+                String ehrIdString = ((List<String>) data.get("ehr_id")).getFirst();
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                     "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                            + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
-                UUID ehrId = null;
+                            + ehrIdString + "'"));
+                UUID ehrId;
                 if (ehrIds.getRows().isEmpty()) {
                     EhrStatus es = new EhrStatus();
                     es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
@@ -396,11 +418,13 @@ public final class OpenEhrObds {
                     es.setQueryable(true);
                     es.setModifiable(true);
                     es.setSubject(new PartySelf(new PartyRef(
-                            new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()),
-                            "DEMOGRAPHIC", "PERSON")));
+                            new HierObjectId(ehrIdString), "DEMOGRAPHIC", "PERSON")));
                     ehrId = openEhrClient.ehrEndpoint().createEhr(es);
                 } else if (ehrIds.getRows().size() == 1) {
                     ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+                } else {
+                    Logger.error("Found more than one EHR for ehr_id {}!", ehrIdString);
+                    throw new ProcessingException();
                 }
                 openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
                 break;
@@ -450,14 +474,14 @@ public final class OpenEhrObds {
                     writerXDS.write(content);
                     writerXDS.close();
                 } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    throw new ProcessingException(e);
                 }
                 break;
             default:
         }
     }
 
-    private static void deleteOpenEhrComposition(String sampleId) {
+    private static void deleteOpenEhrComposition(String sampleId) throws ProcessingException {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
@@ -472,9 +496,9 @@ public final class OpenEhrObds {
                 }
 
                 if (ehrIds.getRows().size() > 1) {
-                    Logger.info("Found more than one composition for ID: {} from system: {}! This should not happen!",
-                            sampleId, Settings.getSystemId());
-                    return;
+                    Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
+                                   + " This should not happen!", sampleId, Settings.getSystemId());
+                    throw new ProcessingException();
                 }
 
                 UUID ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());

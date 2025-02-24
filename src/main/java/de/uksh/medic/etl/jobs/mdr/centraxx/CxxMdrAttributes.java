@@ -50,7 +50,7 @@ public final class CxxMdrAttributes {
         RestTemplate rt = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl(mdr.getUrl() + "/rest/v1/itemsets/attributes/item");
+                .fromUriString(mdr.getUrl() + "/rest/v1/itemsets/attributes/item");
         builder.queryParams(form);
         headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON.toString());
         headers.add(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.toString());

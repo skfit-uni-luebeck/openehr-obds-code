@@ -10,7 +10,8 @@ public class KafkaSettings {
     private String password;
     private String group;
     private String offset;
-    private String topic;
+    private String readTopic;
+    private String errorTopic;
     private String clientID = "Specimen ETL 0.1";
 
     public String getUrl() {
@@ -37,7 +38,11 @@ public class KafkaSettings {
         return offset;
     }
 
-    public String getTopic() {
-        return topic;
+    public String getReadTopic() {
+        return readTopic;
+    }
+
+    public String getErrorTopic() {
+        return errorTopic;
     }
 }

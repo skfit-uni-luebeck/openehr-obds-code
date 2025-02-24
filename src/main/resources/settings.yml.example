@@ -13,7 +13,8 @@ kafka:
   url:
   group:
   offset: earliest
-  topic:
+  readTopic:
+  errorTopic:
 target:
 mapping:
   /Patient/Meldung/Tumorzuordnung:

@@ -24,7 +24,7 @@ public class CxxMdrSettings {
 
     public void setToken(String newToken, int expiresIn) {
         this.token = newToken;
-        tokenExpiration = System.currentTimeMillis() + SECONDMILLISECOND * expiresIn;
+        tokenExpiration = System.currentTimeMillis() + (long) SECONDMILLISECOND * expiresIn;
     }
 
     public String getUsername() {

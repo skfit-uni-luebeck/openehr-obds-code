@@ -14,7 +14,7 @@ import org.tinylog.Logger;
  */
 public final class FhirResolver {
 
-    private static FhirContext ctx = FhirContext.forR4();
+    private static final FhirContext CTX = FhirContext.forR4();
     private static IGenericClient terminologyClient;
 
     private FhirResolver() {
@@ -25,7 +25,7 @@ public final class FhirResolver {
      */
     public static void initialize() {
         if (Settings.getFhirTsUrl() != null) {
-            terminologyClient = ctx.newRestfulGenericClient(Settings.getFhirTsUrl().toString());
+            terminologyClient = CTX.newRestfulGenericClient(Settings.getFhirTsUrl().toString());
         }
     }
 
