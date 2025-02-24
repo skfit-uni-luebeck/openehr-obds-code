@@ -206,6 +206,9 @@ public final class OpenEhrObds {
         consumerConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, Settings.getKafka().getOffset());
         consumerConfig.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         consumerConfig.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        consumerConfig.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
+        // 2min max intervall to process 1 bundle
+        consumerConfig.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "120000");
         return consumerConfig;
     }
 
