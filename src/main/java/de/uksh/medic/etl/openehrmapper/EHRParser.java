@@ -63,17 +63,14 @@ public class EHRParser {
         Composition composition = new Composition();
 
         composition.setArchetypeNodeId(
-                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING))
-                        .trim());
+                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING)).trim());
 
         composition.setNameAsString(
-                ((String) xp.evaluate("//template/definition/template_id", doc, XPathConstants.STRING))
-                        .trim());
+                ((String) xp.evaluate("//template/definition/template_id", doc, XPathConstants.STRING)).trim());
 
         Archetyped archetypeDetails = new Archetyped();
         archetypeDetails.setArchetypeId(new ArchetypeID(
-                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING))
-                        .trim()));
+                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING)).trim()));
 
         TemplateId templateId = new TemplateId();
         templateId.setValue(((String) xp.evaluate("//template/template_id", doc, XPathConstants.STRING)).trim());

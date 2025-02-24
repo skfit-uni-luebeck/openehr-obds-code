@@ -412,6 +412,7 @@ public final class OpenEhrObds {
                             + ehrIdString + "'"));
                 UUID ehrId;
                 if (ehrIds.getRows().isEmpty()) {
+                    // todo diesen Fall für Specimen deaktivieren? über Config?
                     EhrStatus es = new EhrStatus();
                     es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
                     es.setName(new DvText("EHR status"));
@@ -495,6 +496,8 @@ public final class OpenEhrObds {
                     return;
                 }
 
+                // todo Specimen: mit Updates wird es mehr als eine Version der Composition geben
+                // iterativ/rekursiv löschen bis alle Einträge weg sind
                 if (ehrIds.getRows().size() > 1) {
                     Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
                                    + " This should not happen!", sampleId, Settings.getSystemId());
