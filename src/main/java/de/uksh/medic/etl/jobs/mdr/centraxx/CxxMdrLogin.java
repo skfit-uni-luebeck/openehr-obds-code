@@ -35,7 +35,7 @@ public final class CxxMdrLogin {
         builder.queryParams(form);
         MdrToken token = rt.postForObject(builder.build().encode().toUri(), null, MdrToken.class);
         if (token != null) {
-            Logger.warn("CXX MDR token not set. Login returned null.");
+            Logger.info("CXX MDR token not set. Login returned null.");
             mdr.setToken(token.getAccessToken(), token.getExpiresIn());
         }
         return mdr;

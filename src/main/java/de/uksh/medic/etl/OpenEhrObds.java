@@ -180,14 +180,17 @@ public final class OpenEhrObds {
             consumer.subscribe(Collections.singleton(Settings.getKafka().getReadTopic()));
 
             while (true) {
+                Logger.debug("Polling Kafka topic");
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(POLL_DURATION));
 
                 for (ConsumerRecord<String, String> record : records) {
+                    Logger.debug("Processing record.");
                     try {
                         walkXmlTree(mapper.readValue(record.value(),
                                 new TypeReference<LinkedHashMap<String, Object>>() {}).entrySet(), 1, "",
                                     new LinkedHashMap<>());
                     } catch (ProcessingException e) {
+                        Logger.error("ProcessingException occured, writing to error topic!");
                         producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
                         producer.flush();
                     }
@@ -247,6 +250,7 @@ public final class OpenEhrObds {
             theMap = result;
 
             if (split) {
+                Logger.info("Building composition.");
                 buildOpenEhrComposition(m.getTemplateId(), result);
             }
         }
@@ -361,8 +365,7 @@ public final class OpenEhrObds {
         conv.setTargetProfileCode(m.getTarget());
         conv.setSourceProfileVersion(m.getSourceVersion());
         conv.setTargetProfileVersion(m.getTargetVersion());
-        conv.setValues(xmlSet.stream()
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue)));
+        conv.setValues(xmlSet.stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue)));
         try {
             return CxxMdrConvert.convert(Settings.getCxxmdr(), conv).getValues();
         } catch (JsonProcessingException e) {
@@ -379,6 +382,7 @@ public final class OpenEhrObds {
 
         if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
                 && "KDS_Biobank".equals(templateId)) {
+            Logger.info("Found DELETE entry, trying to delete composition...");
             deleteOpenEhrComposition(((List<String>) data.get("cxxId")).getFirst());
             return;
         } else {
@@ -398,6 +402,7 @@ public final class OpenEhrObds {
         }
 
         if (Settings.getKafka().getUrl().isEmpty()) {
+            Logger.debug("Kafka URL is empty, writing compositon to file.");
             try (BufferedWriter writer = new BufferedWriter(
                     new FileWriter("fileOutput/" + i++ + "_"
                             + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
