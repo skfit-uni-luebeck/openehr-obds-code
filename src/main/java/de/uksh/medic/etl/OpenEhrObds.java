@@ -383,7 +383,7 @@ public final class OpenEhrObds {
         if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
                 && "KDS_Biobank".equals(templateId)) {
             Logger.info("Found DELETE entry, trying to delete composition...");
-            deleteOpenEhrComposition(((List<String>) data.get("cxxId")).getFirst());
+            deleteOpenEhrComposition(templateId, ((List<String>) data.get("cxxId")).getFirst());
             return;
         } else {
             data.remove("requestMethod");
@@ -490,17 +490,18 @@ public final class OpenEhrObds {
         }
     }
 
-    private static void deleteOpenEhrComposition(String sampleId) throws ProcessingException {
+    private static void deleteOpenEhrComposition(String templateId, String sampleId) throws ProcessingException {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                     "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
                             + "FROM EHR e "
-                            + "CONTAINS COMPOSITION c#KDS_Biobank "
-                            + "WHERE c/system_id = '" + Settings.getSystemId() + "'"
+                            + "CONTAINS COMPOSITION c#" + templateId
+                            + " WHERE c/system_id = '" + Settings.getSystemId() + "' "
                             + "AND c/id = '" + sampleId + "'"));
                 if (ehrIds.getRows().isEmpty()) {
-                    Logger.info("Nothing to delete for ID: {} from system: {}", sampleId, Settings.getSystemId());
+                    Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
+                            templateId, sampleId, Settings.getSystemId());
                     return;
                 }
 
