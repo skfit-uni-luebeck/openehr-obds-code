@@ -11,7 +11,8 @@ public class Mapping {
     private int targetVersion;
     private boolean split;
     private String templateId;
-    private boolean uniqueComposition = false;
+    private boolean uniqueComposition;
+    private boolean update;
 
     public String getSource() {
         return source;
@@ -67,5 +68,13 @@ public class Mapping {
 
     public void setUniqueComposition(boolean uniqueComposition) {
         this.uniqueComposition = uniqueComposition;
+    }
+
+    public boolean isUpdate() {
+        return update;
+    }
+
+    public void setUpdate(boolean update) {
+        this.update = update;
     }
 }

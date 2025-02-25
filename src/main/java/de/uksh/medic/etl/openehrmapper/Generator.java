@@ -420,7 +420,7 @@ public class Generator {
             throws Exception {
         String nodeId = getNodeId(path);
         String newPath = path + "/attributes[rm_attribute_name = \"value\"]";
-        String label = getLabel(nodeId, name);
+        String label = getElementLabel(path, nodeId, name);
 
         if (!map.containsKey(nodeId)) {
             if (isMandatory(path)) {
@@ -683,6 +683,19 @@ public class Generator {
             cache.put(path, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         return cache.get(path);
+    }
+
+    private String getElementLabel(String path, String code, String archetype) throws Exception {
+        String newPath = path + "/../../term_definitions[@code=\"" + code
+                + "\"]/items[@id=\"text\"]/text()";
+        if (!cache.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if ("".equals(cache.get(newPath))) {
+            return getElementLabel(path + "/../..", code, archetype);
+        }
+        return cache.get(newPath);
     }
 
     private String getTypeLabel(String path, String code) throws Exception {

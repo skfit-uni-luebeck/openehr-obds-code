@@ -233,6 +233,8 @@ public final class OpenEhrObds {
 
         boolean split = Settings.getMapping().containsKey(path)
                 && Settings.getMapping().get(path).getSplit();
+        boolean update = Settings.getMapping().containsKey(path)
+                && Settings.getMapping().get(path).isUpdate();
 
         Map<String, Object> theMap = resMap;
 
@@ -248,6 +250,16 @@ public final class OpenEhrObds {
 
             result.putAll(resMap);
             theMap = result;
+
+            if (update) {
+                if (result.get("requestMethod") != null && "DELETE".equals(((List<String>) result.get("requestMethod")).getFirst())) {
+                    Logger.info("Found DELETE entry, trying to delete composition...");
+                    deleteOpenEhrComposition(m.getTemplateId(), ((List<String>) result.get("cxxId")).getFirst());
+                    return;
+                } else {
+                    result.remove("requestMethod");
+                }
+            }
 
             if (split) {
                 Logger.info("Building composition.");
@@ -380,15 +392,6 @@ public final class OpenEhrObds {
         String ehr;
         Composition composition;
 
-        if (data.get("requestMethod") != null && "DELETE".equals(((List<String>) data.get("requestMethod")).getFirst())
-                && "KDS_Biobank".equals(templateId)) {
-            Logger.info("Found DELETE entry, trying to delete composition...");
-            deleteOpenEhrComposition(templateId, ((List<String>) data.get("cxxId")).getFirst());
-            return;
-        } else {
-            data.remove("requestMethod");
-        }
-
         try {
             // Write JSON to file
             composition = PARSERS.get(templateId).build(data);
@@ -419,7 +422,7 @@ public final class OpenEhrObds {
                     "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
                             + ehrIdString + "'"));
                 UUID ehrId;
-                if (ehrIds.getRows().isEmpty()) {
+                if (ehrIds.getRows() == null) {
                     // todo diesen Fall für Specimen deaktivieren? über Config?
                     EhrStatus es = new EhrStatus();
                     es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
@@ -435,9 +438,10 @@ public final class OpenEhrObds {
                     Logger.error("Found more than one EHR for ehr_id {}!", ehrIdString);
                     throw new ProcessingException();
                 }
-
-                if (uniqueComposition) {
-                    deleteOpenEhrComposition(templateId, ((List<String>) data.get("cxxId")).getFirst());
+                
+                ObjectVersionId ovi = getVersionUid(templateId, ((List<String>) data.get("cxxId")).getFirst());
+                if (ovi != null) {
+                    composition.setUid(ovi);
                 }
                 openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
                 break;
@@ -500,10 +504,11 @@ public final class OpenEhrObds {
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                     "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
                             + "FROM EHR e "
-                            + "CONTAINS COMPOSITION c#" + templateId
-                            + " WHERE c/system_id = '" + Settings.getSystemId() + "' "
-                            + "AND c/id = '" + sampleId + "'"));
-                if (ehrIds.getRows().isEmpty()) {
+                            + "CONTAINS COMPOSITION c"
+                            + " WHERE c/name/value = '" + templateId + "'"
+                            + " AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "' "
+                            + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
+                if (ehrIds.getRows() == null) {
                     Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
                             templateId, sampleId, Settings.getSystemId());
                     return;
@@ -525,4 +530,35 @@ public final class OpenEhrObds {
             default:
         }
     }
+    private static ObjectVersionId getVersionUid(String templateId, String sampleId) throws ProcessingException {
+        switch (Settings.getTarget()) {
+            case "raw":
+                QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                    "SELECT c/uid/value AS uid_based_id "
+                            + "FROM EHR e "
+                            + "CONTAINS COMPOSITION c"
+                            + " WHERE c/name/value = '" + templateId + "'"
+                            + " AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "' "
+                            + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
+                if (ehrIds.getRows() == null) {
+                    Logger.info("No composition found.",
+                            templateId, sampleId, Settings.getSystemId());
+                    return null;
+                }
+
+                if (ehrIds.getRows().size() > 1) {
+                    Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
+                                   + " This should not happen!", sampleId, Settings.getSystemId());
+                    throw new ProcessingException();
+                }
+
+                ObjectVersionId versionId = new ObjectVersionId((String) ehrIds.getRows().getFirst().getFirst());
+                return versionId;
+            case "xds":
+                return null;
+            default:
+                return null;
+        }
+    }
+
 }
