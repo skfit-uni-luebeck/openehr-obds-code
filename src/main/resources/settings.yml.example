@@ -24,5 +24,6 @@ mapping:
     targetVersion: 1
     split: false
     templateId:
+    uniqueComposition: false
 depthLimit: 4
 systemId:

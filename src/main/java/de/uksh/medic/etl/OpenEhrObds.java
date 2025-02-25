@@ -152,7 +152,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File f = new File("bundle.json");
+            File f = new File("PUTbundleMPI.json");
             //File f = new File("op.xml");
 
             walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
@@ -251,7 +251,7 @@ public final class OpenEhrObds {
 
             if (split) {
                 Logger.info("Building composition.");
-                buildOpenEhrComposition(m.getTemplateId(), result);
+                buildOpenEhrComposition(m.getTemplateId(), result, m.isUniqueComposition());
             }
         }
 
@@ -375,7 +375,7 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings("unchecked")
-    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data)
+    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data, boolean uniqueComposition)
             throws ProcessingException {
         String ehr;
         Composition composition;
@@ -434,6 +434,10 @@ public final class OpenEhrObds {
                 } else {
                     Logger.error("Found more than one EHR for ehr_id {}!", ehrIdString);
                     throw new ProcessingException();
+                }
+
+                if (uniqueComposition) {
+                    deleteOpenEhrComposition(templateId, ((List<String>) data.get("cxxId")).getFirst());
                 }
                 openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
                 break;
@@ -505,8 +509,6 @@ public final class OpenEhrObds {
                     return;
                 }
 
-                // todo Specimen: mit Updates wird es mehr als eine Version der Composition geben
-                // iterativ/rekursiv löschen bis alle Einträge weg sind
                 if (ehrIds.getRows().size() > 1) {
                     Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
                                    + " This should not happen!", sampleId, Settings.getSystemId());
