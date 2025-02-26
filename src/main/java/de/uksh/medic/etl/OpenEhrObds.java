@@ -22,10 +22,7 @@ import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxItemSet;
 import de.uksh.medic.etl.model.mdr.centraxx.RelationConvert;
 import de.uksh.medic.etl.openehrmapper.EHRParser;
-import de.uksh.medic.etl.settings.ConfigurationLoader;
-import de.uksh.medic.etl.settings.CxxMdrSettings;
-import de.uksh.medic.etl.settings.Mapping;
-import de.uksh.medic.etl.settings.Settings;
+import de.uksh.medic.etl.settings.*;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -67,7 +64,6 @@ import org.tinylog.Logger;
 
 public final class OpenEhrObds {
 
-    private static final int POLL_DURATION = 1000;
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
@@ -154,7 +150,7 @@ public final class OpenEhrObds {
 
         Logger.info("OpenEhrObds started!");
 
-        if (Settings.getKafka().getUrl().isEmpty()) {
+        if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
             File f = new File("PUTbundleMPI.json");
             //File f = new File("op.xml");
@@ -185,7 +181,8 @@ public final class OpenEhrObds {
 
             while (true) {
                 Logger.debug("Polling Kafka topic");
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(POLL_DURATION));
+                ConsumerRecords<String, String> records = consumer.poll(
+                        Duration.ofMillis(Settings.getKafka().getPollDuration()));
 
                 for (ConsumerRecord<String, String> record : records) {
                     Logger.debug("Processing record.");
@@ -199,6 +196,7 @@ public final class OpenEhrObds {
                         producer.flush();
                     }
                 }
+                consumer.commitSync();
             }
         } catch (WakeupException e) {
             Logger.debug("Caught wake up exception.");
@@ -206,15 +204,17 @@ public final class OpenEhrObds {
     }
 
     private static Properties getConsumerProperties() {
+        KafkaSettings settings = Settings.getKafka();
         Properties consumerConfig = new Properties();
-        consumerConfig.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, Settings.getKafka().getClientID());
-        consumerConfig.setProperty(ConsumerConfig.GROUP_ID_CONFIG, Settings.getKafka().getGroup());
-        consumerConfig.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, Settings.getKafka().getUrl());
-        consumerConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, Settings.getKafka().getOffset());
+        consumerConfig.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, settings.getClientID());
+        consumerConfig.setProperty(ConsumerConfig.GROUP_ID_CONFIG, settings.getGroup());
+        consumerConfig.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, settings.getUrl());
+        consumerConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, settings.getOffset());
+        consumerConfig.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         consumerConfig.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         consumerConfig.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        consumerConfig.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
-        // 2min max intervall to process 1 bundle
+        consumerConfig.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, settings.getPollRecords());
+        // 2min max intervall to process getPollRecords() bundle
         consumerConfig.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "120000");
         return consumerConfig;
     }
@@ -403,8 +403,8 @@ public final class OpenEhrObds {
             throw new ProcessingException(e);
         }
 
-        if (Settings.getKafka().getUrl().isEmpty()) {
-            Logger.debug("Kafka URL is empty, writing compositon to file.");
+        if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
+            Logger.debug("Kafka URL is not set, writing compositon to file.");
             try (BufferedWriter writer = new BufferedWriter(
                     new FileWriter("fileOutput/" + i++ + "_"
                             + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {

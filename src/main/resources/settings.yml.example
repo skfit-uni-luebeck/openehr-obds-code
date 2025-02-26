@@ -11,11 +11,14 @@ openEhrUser:
 openEhrPassword:
 xdsUrl:
 kafka:
+  clientID:
   url:
   group:
   offset: earliest
   readTopic:
   errorTopic:
+  pollDuration:
+  pollRecords:
 target:
 mapping:
   /Patient/Meldung/Tumorzuordnung:

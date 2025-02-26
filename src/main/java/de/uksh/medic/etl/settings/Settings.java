@@ -91,7 +91,7 @@ public final class Settings {
     }
 
     public static String getTarget() {
-        return target;
+        return target != null ? target : "";
     }
 
     @JsonProperty("target")

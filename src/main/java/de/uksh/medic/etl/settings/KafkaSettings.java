@@ -4,26 +4,19 @@ package de.uksh.medic.etl.settings;
  * Settings for Kafka Consumer.
  */
 public class KafkaSettings {
+    private static final int DEFAULT_POLL_DURATION = 1000;
 
-    private String url = "";
-    private String username;
-    private String password;
+    private String url;
     private String group;
     private String offset;
     private String readTopic;
     private String errorTopic;
-    private String clientID = "Specimen ETL 0.1";
+    private int pollDuration;
+    private int pollRecords;
+    private String clientID;
 
     public String getUrl() {
         return url;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getPassword() {
-        return password;
     }
 
     public String getClientID() {
@@ -44,5 +37,13 @@ public class KafkaSettings {
 
     public String getErrorTopic() {
         return errorTopic;
+    }
+
+    public int getPollDuration() {
+        return pollDuration > 0 ? pollDuration : DEFAULT_POLL_DURATION;
+    }
+
+    public String getPollRecords() {
+        return pollRecords > 0 ? String.valueOf(pollRecords) : "5";
     }
 }
