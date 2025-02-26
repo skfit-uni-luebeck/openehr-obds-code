@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -92,7 +94,9 @@ public final class OpenEhrObds {
             String credentials = ehrBaseUrl.toString();
             try {
                 ehrBaseUrl = new URI(credentials.replace("://",
-                        "://" + Settings.getOpenEhrUser() + ":" + Settings.getOpenEhrPassword() + "@"));
+                        "://" + URLEncoder.encode(Settings.getOpenEhrUser(), StandardCharsets.UTF_8) + ":"
+                                + URLEncoder.encode(Settings.getOpenEhrPassword(), StandardCharsets.UTF_8))
+                        + "@");
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
             }
@@ -153,7 +157,7 @@ public final class OpenEhrObds {
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
             File f = new File("PUTbundleMPI.json");
-            //File f = new File("op.xml");
+            // File f = new File("op.xml");
 
             walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
             }).entrySet(), 1, "", new LinkedHashMap<>());
@@ -161,7 +165,7 @@ public final class OpenEhrObds {
         }
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(getConsumerProperties());
-             KafkaProducer<String, String> producer = new KafkaProducer<>(getProducerProperties())) {
+                KafkaProducer<String, String> producer = new KafkaProducer<>(getProducerProperties())) {
             final Thread mainThread = Thread.currentThread();
 
             // adding the shutdown hook
@@ -188,8 +192,9 @@ public final class OpenEhrObds {
                     Logger.debug("Processing record.");
                     try {
                         walkXmlTree(mapper.readValue(record.value(),
-                                new TypeReference<LinkedHashMap<String, Object>>() {}).entrySet(), 1, "",
-                                    new LinkedHashMap<>());
+                                new TypeReference<LinkedHashMap<String, Object>>() {
+                                }).entrySet(), 1, "",
+                                new LinkedHashMap<>());
                     } catch (ProcessingException e) {
                         Logger.error("ProcessingException occured, writing to error topic!");
                         producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
@@ -228,9 +233,9 @@ public final class OpenEhrObds {
         return producerConfig;
     }
 
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings({ "unchecked" })
     public static void walkXmlTree(Set<Entry<String, Object>> xmlSet, int depth, String path,
-                                   Map<String, Object> resMap) {
+            Map<String, Object> resMap) {
         if (depth > Settings.getDepthLimit()) {
             return;
         }
@@ -271,10 +276,10 @@ public final class OpenEhrObds {
             int newDepth = depth + 1;
 
             switch (entry.getValue()) {
-                case @SuppressWarnings("rawtypes")Map h -> {
+                case @SuppressWarnings("rawtypes") Map h -> {
                     walkXmlTree(h.entrySet(), newDepth, newPath, theMap);
                 }
-                case @SuppressWarnings("rawtypes")List a -> {
+                case @SuppressWarnings("rawtypes") List a -> {
                     for (Object b : a) {
                         Logger.debug(entry.getKey());
                         walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
@@ -298,7 +303,7 @@ public final class OpenEhrObds {
         });
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private static void queryFhirTs(Mapping m, Entry<String, Object> e) {
         if (e.getValue() == null) {
             return;
@@ -339,7 +344,7 @@ public final class OpenEhrObds {
         return out;
     }
 
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings({ "unchecked" })
     private static void splitMap(Object value, List<String> key, Map<String, Object> out) {
         if (key.size() > 1) {
             String k = key.removeFirst();
@@ -418,8 +423,9 @@ public final class OpenEhrObds {
             case "raw":
                 String ehrIdString = ((List<String>) data.get("ehr_id")).getFirst();
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                    "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                            + ehrIdString + "'"));
+                        "SELECT e/ehr_id/value as EHR_ID"
+                                + " FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                                + ehrIdString + "'"));
                 UUID ehrId;
                 if (ehrIds.getRows() == null) {
                     // todo diesen Fall für Specimen deaktivieren? über Config?
@@ -486,12 +492,13 @@ public final class OpenEhrObds {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                    "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
-                            + "FROM EHR e "
-                            + "CONTAINS COMPOSITION c "
-                            + "WHERE c/name/value = '" + templateId + "' "
-                            + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "'"
-                            + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
+                        "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
+                                + "FROM EHR e "
+                                + "CONTAINS COMPOSITION c "
+                                + "WHERE c/name/value = '" + templateId + "' "
+                                + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId()
+                                + "'"
+                                + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
                 if (ehrIds.getRows() == null) {
                     Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
                             templateId, sampleId, Settings.getSystemId());
@@ -500,7 +507,7 @@ public final class OpenEhrObds {
 
                 if (ehrIds.getRows().size() > 1) {
                     Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
-                                   + " This should not happen!", sampleId, Settings.getSystemId());
+                            + " This should not happen!", sampleId, Settings.getSystemId());
                     throw new ProcessingException();
                 }
 
@@ -519,12 +526,13 @@ public final class OpenEhrObds {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                    "SELECT c/uid/value AS uid_based_id "
-                            + "FROM EHR e "
-                            + "CONTAINS COMPOSITION c "
-                            + "WHERE c/name/value = '" + templateId + "' "
-                            + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "'"
-                            + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
+                        "SELECT c/uid/value AS uid_based_id "
+                                + "FROM EHR e "
+                                + "CONTAINS COMPOSITION c "
+                                + "WHERE c/name/value = '" + templateId + "' "
+                                + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId()
+                                + "'"
+                                + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
                 if (ehrIds.getRows() == null) {
                     Logger.info("No composition found for templateId {}, originalId {} from system: {}",
                             templateId, sampleId, Settings.getSystemId());
@@ -533,7 +541,7 @@ public final class OpenEhrObds {
 
                 if (ehrIds.getRows().size() > 1) {
                     Logger.error("Found more than one composition for ID: {} from system: {}!"
-                                   + " This should not happen!", sampleId, Settings.getSystemId());
+                            + " This should not happen!", sampleId, Settings.getSystemId());
                     throw new ProcessingException();
                 }
 
