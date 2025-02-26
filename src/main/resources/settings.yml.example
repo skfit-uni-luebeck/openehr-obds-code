@@ -9,6 +9,7 @@ fhirTsUrl:
 openEhrUrl:
 openEhrUser:
 openEhrPassword:
+xdsUrl:
 kafka:
   url:
   group:

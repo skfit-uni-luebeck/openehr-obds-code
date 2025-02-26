@@ -11,7 +11,6 @@ public class Mapping {
     private int targetVersion;
     private boolean split;
     private String templateId;
-    private boolean uniqueComposition;
     private boolean update;
 
     public String getSource() {
@@ -60,14 +59,6 @@ public class Mapping {
 
     public void setTemplateId(String templateId) {
         this.templateId = templateId;
-    }
-
-    public boolean isUniqueComposition() {
-        return uniqueComposition;
-    }
-
-    public void setUniqueComposition(boolean uniqueComposition) {
-        this.uniqueComposition = uniqueComposition;
     }
 
     public boolean isUpdate() {

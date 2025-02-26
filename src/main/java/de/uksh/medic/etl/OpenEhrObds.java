@@ -59,6 +59,10 @@ import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRes
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.tinylog.Logger;
 
 public final class OpenEhrObds {
@@ -88,7 +92,7 @@ public final class OpenEhrObds {
         }
 
         URI ehrBaseUrl = Settings.getOpenEhrUrl();
-        if (Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
+        if (ehrBaseUrl != null && Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
             String credentials = ehrBaseUrl.toString();
             try {
                 ehrBaseUrl = new URI(credentials.replace("://",
@@ -231,10 +235,8 @@ public final class OpenEhrObds {
             return;
         }
 
-        boolean split = Settings.getMapping().containsKey(path)
-                && Settings.getMapping().get(path).getSplit();
-        boolean update = Settings.getMapping().containsKey(path)
-                && Settings.getMapping().get(path).isUpdate();
+        boolean split = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSplit();
+        boolean update = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).isUpdate();
 
         Map<String, Object> theMap = resMap;
 
@@ -251,19 +253,16 @@ public final class OpenEhrObds {
             result.putAll(resMap);
             theMap = result;
 
-            if (update) {
-                if (result.get("requestMethod") != null && "DELETE".equals(((List<String>) result.get("requestMethod")).getFirst())) {
-                    Logger.info("Found DELETE entry, trying to delete composition...");
-                    deleteOpenEhrComposition(m.getTemplateId(), ((List<String>) result.get("cxxId")).getFirst());
-                    return;
-                } else {
-                    result.remove("requestMethod");
-                }
+            if (update && result.get("requestMethod") != null
+                    && "DELETE".equals(((List<String>) result.get("requestMethod")).getFirst())) {
+                Logger.info("Found DELETE entry, trying to delete composition...");
+                deleteOpenEhrComposition(m.getTemplateId(), ((List<String>) result.get("cxxId")).getFirst());
+                return;
             }
 
             if (split) {
                 Logger.info("Building composition.");
-                buildOpenEhrComposition(m.getTemplateId(), result, m.isUniqueComposition());
+                buildOpenEhrComposition(m.getTemplateId(), result);
             }
         }
 
@@ -387,7 +386,7 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings("unchecked")
-    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data, boolean uniqueComposition)
+    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data)
             throws ProcessingException {
         String ehr;
         Composition composition;
@@ -438,7 +437,7 @@ public final class OpenEhrObds {
                     Logger.error("Found more than one EHR for ehr_id {}!", ehrIdString);
                     throw new ProcessingException();
                 }
-                
+
                 ObjectVersionId ovi = getVersionUid(templateId, ((List<String>) data.get("cxxId")).getFirst());
                 if (ovi != null) {
                     composition.setUid(ovi);
@@ -446,34 +445,6 @@ public final class OpenEhrObds {
                 openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
                 break;
             case "xds":
-                // // create flat json
-                // FlatJsonMarshaller fjm = new FlatJsonMarshaller();
-                // ehr = fjm.toFlatJson(composition, template);
-
-                // // Convert to TDD
-
-                // RestTemplate rt = new RestTemplate();
-                // if (Settings.getOpenEhrUser() != null || Settings.getOpenEhrPassword() !=
-                // null) {
-                // rt.getInterceptors().add(
-                // new BasicAuthenticationInterceptor(Settings.getOpenEhrUser(),
-                // Settings.getOpenEhrPassword()));
-                // }
-                // MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-                // form.set("templateId", templateId);
-                // form.set("format", "FLAT");
-                // UriComponentsBuilder builder = UriComponentsBuilder
-                // .fromHttpUrl(Settings.getOpenEhrUrl() + "rest/v1/composition/convert/tdd");
-                // builder.queryParams(form);
-
-                // HttpHeaders headers = new HttpHeaders();
-                // headers.set("Content-Type", "application/json");
-                // headers.set("Accept", "application/xml");
-
-                // String tdd = rt.postForObject(builder.build().encode().toUri(), new
-                // HttpEntity<>(ehr, headers),
-                // String.class);
-
                 // XDS Envelope
 
                 try (InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream("iti41.xml")) {
@@ -490,6 +461,19 @@ public final class OpenEhrObds {
                             new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".xml"));
                     writerXDS.write(content);
                     writerXDS.close();
+
+                    // XDS Upload
+
+                    RestTemplate rt = new RestTemplate();
+                    UriComponentsBuilder builder = UriComponentsBuilder.fromUri(Settings.getXdsUrl());
+
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.set("Content-Type", "application/xml");
+                    headers.set("Accept", "application/xml");
+
+                    String xds = rt.postForObject(builder.build().encode().toUri(), new HttpEntity<>(content, headers),
+                            String.class);
+                    Logger.debug(xds);
                 } catch (IOException e) {
                     throw new ProcessingException(e);
                 }
@@ -504,9 +488,9 @@ public final class OpenEhrObds {
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                     "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
                             + "FROM EHR e "
-                            + "CONTAINS COMPOSITION c"
-                            + " WHERE c/name/value = '" + templateId + "'"
-                            + " AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "' "
+                            + "CONTAINS COMPOSITION c "
+                            + "WHERE c/name/value = '" + templateId + "' "
+                            + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "'"
                             + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
                 if (ehrIds.getRows() == null) {
                     Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
@@ -530,30 +514,30 @@ public final class OpenEhrObds {
             default:
         }
     }
+
     private static ObjectVersionId getVersionUid(String templateId, String sampleId) throws ProcessingException {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                     "SELECT c/uid/value AS uid_based_id "
                             + "FROM EHR e "
-                            + "CONTAINS COMPOSITION c"
-                            + " WHERE c/name/value = '" + templateId + "'"
-                            + " AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "' "
+                            + "CONTAINS COMPOSITION c "
+                            + "WHERE c/name/value = '" + templateId + "' "
+                            + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId() + "'"
                             + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
                 if (ehrIds.getRows() == null) {
-                    Logger.info("No composition found.",
+                    Logger.info("No composition found for templateId {}, originalId {} from system: {}",
                             templateId, sampleId, Settings.getSystemId());
                     return null;
                 }
 
                 if (ehrIds.getRows().size() > 1) {
-                    Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
+                    Logger.error("Found more than one composition for ID: {} from system: {}!"
                                    + " This should not happen!", sampleId, Settings.getSystemId());
                     throw new ProcessingException();
                 }
 
-                ObjectVersionId versionId = new ObjectVersionId((String) ehrIds.getRows().getFirst().getFirst());
-                return versionId;
+                return new ObjectVersionId((String) ehrIds.getRows().getFirst().getFirst());
             case "xds":
                 return null;
             default:

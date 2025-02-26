@@ -103,13 +103,15 @@ public class Generator {
             throws Exception {
         String paramName = getArcheTypeId(path);
         String label = getTypeLabel(path, getNodeId(path));
+        String resolvedPath = paramName + ", '" + label + "'";
         String newPath = path + "/attributes";
         Section section = new Section();
         section.setArchetypeNodeId(paramName);
 
         section.setNameAsString(label);
         List<ContentItem> items = new ArrayList<>();
-        processAttributeChildren(newPath, paramName, items, (Map<String, Object>) map.get(paramName));
+        processAttributeChildren(newPath, paramName, items,
+                (Map<String, Object>) map.getOrDefault(resolvedPath, map.get(paramName)));
         section.setItems(items);
 
         ((List<ContentItem>) jsonmap).add(section);
@@ -121,7 +123,6 @@ public class Generator {
     @SuppressWarnings("unchecked")
     public void gen_ADMIN_ENTRY(String path, String name, Object jsonmap, Map<String, Object> map)
             throws Exception {
-
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
