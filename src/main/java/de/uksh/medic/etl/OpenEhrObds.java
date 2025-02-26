@@ -95,8 +95,8 @@ public final class OpenEhrObds {
             try {
                 ehrBaseUrl = new URI(credentials.replace("://",
                         "://" + URLEncoder.encode(Settings.getOpenEhrUser(), StandardCharsets.UTF_8) + ":"
-                                + URLEncoder.encode(Settings.getOpenEhrPassword(), StandardCharsets.UTF_8))
-                        + "@");
+                                + URLEncoder.encode(Settings.getOpenEhrPassword(), StandardCharsets.UTF_8)
+                        + "@"));
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
             }
