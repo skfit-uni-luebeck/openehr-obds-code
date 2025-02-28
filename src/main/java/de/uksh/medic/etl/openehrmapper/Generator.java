@@ -126,7 +126,7 @@ public class Generator {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
-        String label = getLabel(getNodeId(path), paramName);
+        String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
         if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
@@ -160,7 +160,7 @@ public class Generator {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
-        String label = getLabel(getNodeId(path), paramName);
+        String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
         if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
@@ -194,7 +194,7 @@ public class Generator {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
-        String label = getLabel(getNodeId(path), paramName);
+        String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
         if (!map.containsKey(paramName)) {
@@ -235,7 +235,7 @@ public class Generator {
         String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
         Boolean oaActivities = (Boolean) XP.evaluate(oapActivities, opt, XPathConstants.BOOLEAN);
         Boolean oaProtocol = (Boolean) XP.evaluate(oapProtocol, opt, XPathConstants.BOOLEAN);
-        String label = getLabel(getNodeId(path), paramName);
+        String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
         if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
@@ -273,7 +273,7 @@ public class Generator {
         String nodeId = getNodeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"description\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
-        String label = getLabel(nodeId, name);
+        String label = getLabel(path, nodeId, name);
 
         List<Map<String, Object>> l;
         if (map.containsKey(nodeId) && map.get(nodeId) instanceof List) {
@@ -306,7 +306,7 @@ public class Generator {
         String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
         Boolean oaDescription = (Boolean) XP.evaluate(oapDescription, opt, XPathConstants.BOOLEAN);
         Boolean oaProtocol = (Boolean) XP.evaluate(oapProtocol, opt, XPathConstants.BOOLEAN);
-        String label = getLabel(getNodeId(path), paramName);
+        String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
         if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
@@ -394,7 +394,7 @@ public class Generator {
         if (!map.containsKey(code)) {
             return;
         }
-        String label = getLabel(nodeId, paramName);
+        String label = getLabel(path, nodeId, paramName);
 
         List<Map<String, Object>> l;
         if (map.containsKey(aNodeId) && map.get(aNodeId) instanceof List) {
@@ -588,7 +588,7 @@ public class Generator {
         Long value = Long.valueOf(map.get(name));
         dvo.setValue(value);
         String ordinal = getOrdinal(path, map.get(name));
-        String display = getLabel(ordinal, map.get("name"));
+        String display = getLabel(path, ordinal, map.get("name"));
         DvCodedText ct = new DvCodedText(display, new CodePhrase(new TerminologyId("local"), ordinal, display));
         dvo.setSymbol(ct);
         ((Element) jsonmap).setValue(dvo);
@@ -676,17 +676,36 @@ public class Generator {
         return cache.get(newPath);
     }
 
-    private String getLabel(String code, String archetype) throws Exception {
-        String path = "//archetype_id[value=\"" + archetype + "\"]/../term_definitions[@code=\"" + code
-                + "\"]/items[@id=\"text\"]/text()";
-        if (!cache.containsKey(path)) {
-            XPathExpression expr = XP.compile(path);
-            cache.put(path, (String) expr.evaluate(opt, XPathConstants.STRING));
+    private String getLabel(String path, String code, String archetype) throws Exception {
+
+        String overridePath = path + "/attributes[rm_attribute_name=\"name\"]/children/attributes/children/item/list/text()";
+        if (!cache.containsKey(overridePath)) {
+            XPathExpression expr = XP.compile(overridePath);
+            cache.put(overridePath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return cache.get(path);
+        if (!"".equals(cache.get(overridePath))) {
+            return cache.get(overridePath);
+        }
+        
+        String newPath = "//archetype_id[value=\"" + archetype + "\"]/../term_definitions[@code=\"" + code
+                + "\"]/items[@id=\"text\"]/text()";
+        if (!cache.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        return cache.get(newPath);
     }
 
     private String getElementLabel(String path, String code, String archetype) throws Exception {
+        String overridePath = path + "/attributes[rm_attribute_name=\"name\"]/children/attributes/children/item/list/text()";
+        if (!cache.containsKey(overridePath)) {
+            XPathExpression expr = XP.compile(overridePath);
+            cache.put(overridePath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!"".equals(cache.get(overridePath))) {
+            return cache.get(overridePath);
+        }
+        
         String newPath = path + "/../../term_definitions[@code=\"" + code
                 + "\"]/items[@id=\"text\"]/text()";
         if (!cache.containsKey(newPath)) {
