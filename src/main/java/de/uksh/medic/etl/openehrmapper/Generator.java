@@ -607,13 +607,13 @@ public class Generator {
                 DvQuantity dvq = new DvQuantity("1", Double.valueOf(s), 1L);
                 ((Element) jsonmap).setValue(dvq);
             }
-            case Map m -> {
-                String magnitude = (String) m.getOrDefault("magnitude", null);
+            case String[] m -> {
+                String magnitude = m[0];
                 if (magnitude == null || magnitude.isBlank()) {
                     return;
                 }
-                Long precision = Long.valueOf((String) m.getOrDefault("precision", 1L));
-                String units = (String) m.getOrDefault("unit", "1");
+                Long precision = -1L;
+                String units = (String) m[1];
                 DvQuantity dvq = new DvQuantity(units, Double.valueOf(magnitude), precision);
                 ((Element) jsonmap).setValue(dvq);
             }

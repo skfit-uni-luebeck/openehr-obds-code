@@ -25,13 +25,13 @@ public final class CxxMdrUnitConvert {
      * @param ma MappingAttributes object
      * @return Converted value or null if an error occured
      */
-    public static String[] convert(CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
+    public static String convert(CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
         if (!map.containsKey("magnitude") || !map.containsKey("unit") || map.get("magnitude").isBlank()
                 || map.containsKey("unit") && map.get("unit").isBlank()) {
             return null;
         }
 
-        String[] output = new String[2];
+        String convertedUnit = null;
 
         if (ma.getConceptMap() != null && ma.getTarget() != null && ma.getSystem() != null && ma.getSource() != null) {
             Coding coding = FhirResolver.conceptMap(ma.getConceptMap(), ma.getSystem(), ma.getSource(),
@@ -39,14 +39,18 @@ public final class CxxMdrUnitConvert {
             if (coding == null || coding.getCode() == null || coding.getCode().isBlank()) {
                 return null;
             }
-            output[0] = coding.getCode();
+            convertedUnit = coding.getCode();
+        }
+
+        if (convertedUnit == null) {
+            return null;
         }
 
         RestTemplate rt = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.CONTENT_TYPE, "text/csv");
         String response = rt.postForObject(mdr.getUrl() + "/rest/v1/units/convert",
-                new HttpEntity<>(map.get("magnitude") + "," + map.get("unit") + "," + ma.getUnit(), headers),
+                new HttpEntity<>(map.get("magnitude") + "," + convertedUnit + "," + ma.getUnit(), headers),
                 String.class);
         if (response == null || response.isBlank()) {
             return null;
@@ -55,8 +59,7 @@ public final class CxxMdrUnitConvert {
             CSVReader reader = new CSVReader(new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8)));
             reader.readHeaders();
             reader.line();
-            output[1] = reader.cell("targetValue");
-            return output;
+            return reader.cell("targetValue");
         } catch (IOException ignored) { }
         return null;
     }

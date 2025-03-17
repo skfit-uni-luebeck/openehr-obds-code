@@ -313,10 +313,11 @@ public final class OpenEhrObds {
                 switch (o) {
                     case String c -> listed.add(o);
                     case Map map when map.containsKey("magnitude") && map.containsKey("unit") -> {
-                        String[] newMagnitude = CxxMdrUnitConvert.convert(Settings.getCxxmdr(), map, fa);
+                        String newMagnitude = CxxMdrUnitConvert.convert(Settings.getCxxmdr(), map, fa);
                         if (newMagnitude != null) {
-                            map.replace("unit", newMagnitude[0]);
-                            map.replace("magnitude", newMagnitude[1]);
+                            map.replace("unit", fa.getUnit());
+                            map.replace("magnitude", newMagnitude);
+                            listed.add(new String[]{newMagnitude, fa.getUnit()});
                         }
                     }
                     default -> {
