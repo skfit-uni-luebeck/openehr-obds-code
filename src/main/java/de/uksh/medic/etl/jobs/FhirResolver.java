@@ -34,7 +34,7 @@ public final class FhirResolver {
         params.addParameter("system", new UriType(system));
         params.addParameter("source", new UriType(source));
         params.addParameter("target", new UriType(target));
-        params.addParameter("code", input);
+        params.addParameter("code", new CodeType(input));
         try {
             Parameters result = terminologyClient.operation()
                     .onType("ConceptMap")

@@ -22,9 +22,9 @@ kafka:
 target:
 mapping:
   /Patient/Meldung/Tumorzuordnung:
-    source: 
+    source:
     sourceVersion: 1
-    target: 
+    target:
     targetVersion: 1
     split: false
     templateId:

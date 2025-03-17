@@ -11,6 +11,7 @@ public class MappingAttributes {
     private String id;
     private String code;
     private String version;
+    private String unit;
 
     public MappingAttributes() {
     }
@@ -71,4 +72,11 @@ public class MappingAttributes {
         this.version = version;
     }
 
+    public String getUnit() {
+        return unit;
+    }
+
+    public void setUnit(String unit) {
+        this.unit = unit;
+    }
 }

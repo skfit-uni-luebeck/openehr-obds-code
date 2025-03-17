@@ -14,10 +14,7 @@ import com.nedap.archie.rm.support.identification.HierObjectId;
 import com.nedap.archie.rm.support.identification.ObjectVersionId;
 import com.nedap.archie.rm.support.identification.PartyRef;
 import de.uksh.medic.etl.jobs.FhirResolver;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrAttributes;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrConvert;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrItemSet;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrLogin;
+import de.uksh.medic.etl.jobs.mdr.centraxx.*;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxItemSet;
 import de.uksh.medic.etl.model.mdr.centraxx.RelationConvert;
@@ -156,7 +153,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File f = new File("PUTbundleMPI.json");
+            File f = new File("PUTbundleHEB.json");
             // File f = new File("op.xml");
 
             walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
@@ -311,7 +308,21 @@ public final class OpenEhrObds {
         MappingAttributes fa = FHIR_ATTRIBUTES.get(m.getTarget()).get(e.getKey());
         List<Object> listed = new ArrayList<>();
         for (Object o : (List) e.getValue()) {
-            if (fa != null && fa.getSystem() != null) {
+            if (fa != null && fa.getUnit() != null && !fa.getUnit().isBlank()
+                    && fa.getConceptMap() != null) {
+                switch (o) {
+                    case String c -> listed.add(o);
+                    case Map map when map.containsKey("magnitude") && map.containsKey("unit") -> {
+                        String[] newMagnitude = CxxMdrUnitConvert.convert(Settings.getCxxmdr(), map, fa);
+                        if (newMagnitude != null) {
+                            map.replace("unit", newMagnitude[0]);
+                            map.replace("magnitude", newMagnitude[1]);
+                        }
+                    }
+                    default -> {
+                    }
+                }
+            } else if (fa != null && fa.getSystem() != null) {
                 String code = switch (o) {
                     case String c -> c;
                     case Map map -> ((Map<String, String>) map).get("code");
@@ -408,6 +419,11 @@ public final class OpenEhrObds {
             throw new ProcessingException(e);
         }
 
+        if (!data.containsKey("ehr_id")) {
+            Logger.error("Found no ehr_id in the mapped object!");
+            throw new ProcessingException();
+        }
+
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL is not set, writing compositon to file.");
             try (BufferedWriter writer = new BufferedWriter(
@@ -428,7 +444,6 @@ public final class OpenEhrObds {
                                 + ehrIdString + "'"));
                 UUID ehrId;
                 if (ehrIds.getRows() == null) {
-                    // todo diesen Fall für Specimen deaktivieren? über Config?
                     EhrStatus es = new EhrStatus();
                     es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
                     es.setName(new DvText("EHR status"));

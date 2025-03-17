@@ -600,8 +600,26 @@ public class Generator {
     // DV_AMOUNT
 
     public void gen_DV_QUANTITY(String path, String name, Object jsonmap,
-            Map<String, String> map) {
-        ((Element) jsonmap).setValue(new DvQuantity("1", Double.valueOf(map.get(name)), 1L));
+            Map<String, Object> map) {
+
+        switch (map.get(name)) {
+            case String s -> {
+                DvQuantity dvq = new DvQuantity("1", Double.valueOf(s), 1L);
+                ((Element) jsonmap).setValue(dvq);
+            }
+            case Map m -> {
+                String magnitude = (String) m.getOrDefault("magnitude", null);
+                if (magnitude == null || magnitude.isBlank()) {
+                    return;
+                }
+                Long precision = Long.valueOf((String) m.getOrDefault("precision", 1L));
+                String units = (String) m.getOrDefault("unit", "1");
+                DvQuantity dvq = new DvQuantity(units, Double.valueOf(magnitude), precision);
+                ((Element) jsonmap).setValue(dvq);
+            }
+            default -> {
+            }
+        }
     }
 
     public void gen_DV_COUNT(String path, String name, Object jsonmap,

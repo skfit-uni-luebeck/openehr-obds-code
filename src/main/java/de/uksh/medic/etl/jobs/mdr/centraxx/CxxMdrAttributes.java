@@ -70,6 +70,7 @@ public final class CxxMdrAttributes {
                         case CONCEPTMAP -> ch.setConceptMap(new URI(av.getValue()));
                         case CODE -> ch.setCode(av.getValue());
                         case VERSION -> ch.setVersion(av.getValue());
+                        case UNIT -> ch.setUnit(av.getValue());
                         default -> {
                         }
                     }

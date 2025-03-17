@@ -38,6 +38,10 @@ public enum FhirAttributes {
     /**
      * version attribute in MDR.
      */
+    UNIT("unit"),
+    /**
+     * version attribute in MDR.
+     */
     PATH("path");
 
     private final String label;
