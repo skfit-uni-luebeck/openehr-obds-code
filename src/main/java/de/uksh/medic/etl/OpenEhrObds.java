@@ -250,6 +250,7 @@ public final class OpenEhrObds {
             mapped.values().removeIf(Objects::isNull);
             listConv(mapped);
             mapped.entrySet().forEach(e -> queryFhirTs(m, e));
+            mapped.values().removeIf(Objects::isNull);
             Map<String, Object> result = formatMap(mapped);
 
             result.putAll(resMap);
@@ -318,6 +319,10 @@ public final class OpenEhrObds {
                             map.replace("unit", fa.getUnit());
                             map.replace("magnitude", newMagnitude);
                             listed.add(new String[]{newMagnitude, fa.getUnit()});
+                        } else {
+                            Logger.error("Could not convert unit");
+                            e.setValue(null);
+                            return;
                         }
                     }
                     default -> {
