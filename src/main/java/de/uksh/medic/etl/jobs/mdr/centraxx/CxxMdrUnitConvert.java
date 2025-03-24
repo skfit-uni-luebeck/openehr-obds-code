@@ -3,12 +3,10 @@ package de.uksh.medic.etl.jobs.mdr.centraxx;
 import de.uksh.medic.etl.jobs.FhirResolver;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.settings.CxxMdrSettings;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.utilities.CSVReader;
 import org.springframework.http.HttpEntity;
@@ -22,10 +20,9 @@ public final class CxxMdrUnitConvert {
 
     /**
      * Converts data from a source profile to a target profile using Kairos CentraXX MDR.
-     *
      * @param mdr Configuration for MDR.
      * @param map Map with the current magnitude and unit
-     * @param ma  MappingAttributes object
+     * @param ma MappingAttributes object
      * @return Converted value or null if an error occured
      */
     public static String convert(CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
@@ -64,8 +61,7 @@ public final class CxxMdrUnitConvert {
             reader.readHeaders();
             reader.line();
             return reader.cell("targetValue");
-        } catch (IOException ignored) {
-        }
+        } catch (IOException ignored) { }
         return null;
     }
 }
