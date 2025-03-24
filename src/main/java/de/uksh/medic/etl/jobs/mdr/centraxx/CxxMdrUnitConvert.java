@@ -27,7 +27,7 @@ public final class CxxMdrUnitConvert {
      */
     public static String convert(CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
         if (!map.containsKey("magnitude") || !map.containsKey("unit") || map.get("magnitude").isBlank()
-                || map.containsKey("unit") && map.get("unit").isBlank()) {
+                || map.get("unit").isBlank()) {
             return null;
         }
 
