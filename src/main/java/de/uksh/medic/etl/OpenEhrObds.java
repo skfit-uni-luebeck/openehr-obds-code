@@ -93,7 +93,7 @@ public final class OpenEhrObds {
                 ehrBaseUrl = new URI(credentials.replace("://",
                         "://" + URLEncoder.encode(Settings.getOpenEhrUser(), StandardCharsets.UTF_8) + ":"
                                 + URLEncoder.encode(Settings.getOpenEhrPassword(), StandardCharsets.UTF_8)
-                        + "@"));
+                                + "@"));
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
             }
@@ -318,7 +318,7 @@ public final class OpenEhrObds {
                         if (newMagnitude != null) {
                             map.replace("unit", fa.getUnit());
                             map.replace("magnitude", newMagnitude);
-                            listed.add(new String[]{newMagnitude, fa.getUnit()});
+                            listed.add(new String[] {newMagnitude, fa.getUnit()});
                         } else {
                             Logger.error("Could not convert unit");
                             e.setValue(null);
@@ -513,13 +513,13 @@ public final class OpenEhrObds {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                        "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
+                        String.format("SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
                                 + "FROM EHR e "
                                 + "CONTAINS COMPOSITION c "
-                                + "WHERE c/name/value = '" + templateId + "' "
-                                + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId()
-                                + "'"
-                                + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
+                                + "WHERE c/name/value = '%s' "
+                                + "AND c/feeder_audit/originating_system_audit/system_id = '%s'"
+                                + " AND c/feeder_audit/originating_system_item_ids/id = '%s'", templateId,
+                                Settings.getSystemId(), sampleId)));
                 if (ehrIds.getRows() == null) {
                     Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
                             templateId, sampleId, Settings.getSystemId());
@@ -547,13 +547,13 @@ public final class OpenEhrObds {
         switch (Settings.getTarget()) {
             case "raw":
                 QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                        "SELECT c/uid/value AS uid_based_id "
+                        String.format("SELECT c/uid/value AS uid_based_id "
                                 + "FROM EHR e "
                                 + "CONTAINS COMPOSITION c "
-                                + "WHERE c/name/value = '" + templateId + "' "
-                                + "AND c/feeder_audit/originating_system_audit/system_id = '" + Settings.getSystemId()
-                                + "'"
-                                + " AND c/feeder_audit/originating_system_item_ids/id = '" + sampleId + "'"));
+                                + "WHERE c/name/value = '%s' "
+                                + "AND c/feeder_audit/originating_system_audit/system_id = '%s'"
+                                + " AND c/feeder_audit/originating_system_item_ids/id = '%s'", templateId,
+                                Settings.getSystemId(), sampleId)));
                 if (ehrIds.getRows() == null) {
                     Logger.info("No composition found for templateId {}, originalId {} from system: {}",
                             templateId, sampleId, Settings.getSystemId());
