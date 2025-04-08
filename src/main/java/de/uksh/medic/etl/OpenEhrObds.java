@@ -2,6 +2,8 @@ package de.uksh.medic.etl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
@@ -9,20 +11,15 @@ import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.ehr.EhrStatus;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.HierObjectId;
+import com.nedap.archie.rm.support.identification.ObjectVersionId;
 import com.nedap.archie.rm.support.identification.PartyRef;
 import de.uksh.medic.etl.jobs.FhirResolver;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrAttributes;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrConvert;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrItemSet;
-import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrLogin;
+import de.uksh.medic.etl.jobs.mdr.centraxx.*;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxItemSet;
 import de.uksh.medic.etl.model.mdr.centraxx.RelationConvert;
 import de.uksh.medic.etl.openehrmapper.EHRParser;
-import de.uksh.medic.etl.settings.ConfigurationLoader;
-import de.uksh.medic.etl.settings.CxxMdrSettings;
-import de.uksh.medic.etl.settings.Mapping;
-import de.uksh.medic.etl.settings.Settings;
+import de.uksh.medic.etl.settings.*;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,31 +28,37 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
-import javax.xml.bind.JAXBException;
 import javax.xml.namespace.QName;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.xmlbeans.XmlException;
 import org.apache.xmlbeans.XmlOptions;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.tinylog.Logger;
-import org.xml.sax.SAXException;
 
 public final class OpenEhrObds {
 
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
+    private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
     private static DefaultRestClient openEhrClient;
@@ -79,11 +82,13 @@ public final class OpenEhrObds {
         }
 
         URI ehrBaseUrl = Settings.getOpenEhrUrl();
-        if (Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
+        if (ehrBaseUrl != null && Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
             String credentials = ehrBaseUrl.toString();
             try {
                 ehrBaseUrl = new URI(credentials.replace("://",
-                        "://" + Settings.getOpenEhrUser() + ":" + Settings.getOpenEhrPassword() + "@"));
+                        "://" + URLEncoder.encode(Settings.getOpenEhrUser(), StandardCharsets.UTF_8) + ":"
+                                + URLEncoder.encode(Settings.getOpenEhrPassword(), StandardCharsets.UTF_8)
+                                + "@"));
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
             }
@@ -91,14 +96,26 @@ public final class OpenEhrObds {
 
         openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
 
+        URI finalEhrBaseUrl = ehrBaseUrl;
         Settings.getMapping().values().forEach(m -> {
             if (m.getTemplateId() != null) {
-                Optional<OPERATIONALTEMPLATE> oTemplate = openEhrClient.templateEndpoint()
-                        .findTemplate(m.getTemplateId());
-                assert oTemplate.isPresent();
+                OPERATIONALTEMPLATE template;
+                if (finalEhrBaseUrl != null) {
+                    Optional<OPERATIONALTEMPLATE> oTemplate = openEhrClient.templateEndpoint()
+                            .findTemplate(m.getTemplateId());
+                    assert oTemplate.isPresent();
+                    template = oTemplate.get();
+                } else {
+                    try {
+                        template = OPERATIONALTEMPLATE.Factory.parse(new File(m.getTemplateId() + ".opt"));
+                    } catch (XmlException | IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
                 XmlOptions opts = new XmlOptions();
                 opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
-                PARSERS.put(m.getTemplateId(), new EHRParser(oTemplate.get().xmlText(opts)));
+                PARSERS.put(m.getTemplateId(), new EHRParser(template.xmlText(opts)));
             }
 
             if (m.getSource() == null) {
@@ -113,45 +130,120 @@ public final class OpenEhrObds {
                     FHIR_ATTRIBUTES.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
                             CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "fhir", it.getId()));
                 } catch (URISyntaxException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    Logger.error(e);
                 }
             });
+            try {
+                AQLS.put(m.getTemplateId(),
+                        CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
+            } catch (URISyntaxException e) {
+                Logger.error(e);
+            }
 
         });
 
-        XmlMapper xmlMapper = new XmlMapper();
+        ObjectMapper mapper;
+
+        if ("xml".equals(Settings.getMode())) {
+            mapper = new XmlMapper();
+        } else {
+            mapper = new JsonMapper();
+        }
 
         Logger.info("OpenEhrObds started!");
 
-        // ToDo: Replace with Kafka consumer
+        if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
+            Logger.debug("Kafka URL not set, loading local file");
+            File f = new File("PUTbundleHEB.json");
+            // File f = new File("op.xml");
 
-        // File f = new File("file_1705482004-clean.xml");
-        // File f = new File("file_1705482019-clean.xml");
-        // File f = new File("file_1705482057-clean.xml");
-        File f = new File("tod.xml");
+            walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
+            }).entrySet(), 1, "", new LinkedHashMap<>());
+            System.exit(0);
+        }
 
-        Map<String, Object> m = new LinkedHashMap<>();
-        walkXmlTree(xmlMapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
-        }).entrySet(), 1, "", m);
+        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(getConsumerProperties());
+                KafkaProducer<String, String> producer = new KafkaProducer<>(getProducerProperties())) {
+            final Thread mainThread = Thread.currentThread();
 
+            // adding the shutdown hook
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                Logger.info("Shutdown detected, calling consumer.wakeup()...");
+                consumer.wakeup();
+
+                // join the main thread to allow the execution of the code in the main thread
+                try {
+                    mainThread.join();
+                } catch (InterruptedException e) {
+                    Logger.error(e);
+                }
+            }));
+
+            consumer.subscribe(Collections.singleton(Settings.getKafka().getReadTopic()));
+
+            while (true) {
+                Logger.debug("Polling Kafka topic");
+                ConsumerRecords<String, String> records = consumer.poll(
+                        Duration.ofMillis(Settings.getKafka().getPollDuration()));
+
+                for (ConsumerRecord<String, String> record : records) {
+                    Logger.debug("Processing record.");
+                    try {
+                        walkXmlTree(mapper.readValue(record.value(),
+                                new TypeReference<LinkedHashMap<String, Object>>() {
+                                }).entrySet(), 1, "",
+                                new LinkedHashMap<>());
+                    } catch (ProcessingException e) {
+                        Logger.error("ProcessingException occured, writing to error topic!");
+                        producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
+                        producer.flush();
+                    }
+                }
+                consumer.commitSync();
+            }
+        } catch (WakeupException e) {
+            Logger.debug("Caught wake up exception.");
+        }
+    }
+
+    private static Properties getConsumerProperties() {
+        KafkaSettings settings = Settings.getKafka();
+        Properties consumerConfig = new Properties();
+        consumerConfig.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, settings.getClientID());
+        consumerConfig.setProperty(ConsumerConfig.GROUP_ID_CONFIG, settings.getGroup());
+        consumerConfig.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, settings.getUrl());
+        consumerConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, settings.getOffset());
+        consumerConfig.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        consumerConfig.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        consumerConfig.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        consumerConfig.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, settings.getPollRecords());
+        // 2min max intervall to process getPollRecords() bundle
+        consumerConfig.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "120000");
+        return consumerConfig;
+    }
+
+    private static Properties getProducerProperties() {
+        Properties producerConfig = new Properties();
+        producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, Settings.getKafka().getClientID());
+        producerConfig.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, Settings.getKafka().getUrl());
+        producerConfig.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        return producerConfig;
     }
 
     @SuppressWarnings({ "unchecked" })
-    public static void walkXmlTree(Set<Map.Entry<String, Object>> xmlSet, int depth, String path,
+    public static void walkXmlTree(Set<Entry<String, Object>> xmlSet, int depth, String path,
             Map<String, Object> resMap) {
-
         if (depth > Settings.getDepthLimit()) {
             return;
         }
 
-        boolean split = Settings.getMapping().containsKey(path)
-                && Settings.getMapping().get(path).getSplit();
+        boolean split = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSplit();
+        boolean update = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).isUpdate();
 
         Map<String, Object> theMap = resMap;
 
         if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSource() != null) {
-
             Mapping m = Settings.getMapping().get(path);
 
             Map<String, Object> mapped = convertMdr(xmlSet, m);
@@ -159,18 +251,26 @@ public final class OpenEhrObds {
             mapped.values().removeIf(Objects::isNull);
             listConv(mapped);
             mapped.entrySet().forEach(e -> queryFhirTs(m, e));
+            mapped.values().removeIf(Objects::isNull);
             Map<String, Object> result = formatMap(mapped);
 
             result.putAll(resMap);
             theMap = result;
 
-            if (split) {
-                buildOpenEhrComposition(m.getTemplateId(), result);
+            if (update && result.get("requestMethod") != null
+                    && "DELETE".equals(((List<String>) result.get("requestMethod")).getFirst())) {
+                Logger.info("Found DELETE entry, trying to delete composition...");
+                deleteOpenEhrComposition(m.getTemplateId(), ((List<String>) result.get("cxxId")).getFirst());
+                return;
             }
 
+            if (split) {
+                Logger.info("Building composition.");
+                buildOpenEhrComposition(m.getTemplateId(), result);
+            }
         }
 
-        for (Map.Entry<String, Object> entry : xmlSet) {
+        for (Entry<String, Object> entry : xmlSet) {
             String newPath = path + "/" + entry.getKey();
             int newDepth = depth + 1;
 
@@ -202,14 +302,33 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static void queryFhirTs(Mapping m, Map.Entry<String, Object> e) {
+    private static void queryFhirTs(Mapping m, Entry<String, Object> e) {
         if (e.getValue() == null) {
             return;
         }
         MappingAttributes fa = FHIR_ATTRIBUTES.get(m.getTarget()).get(e.getKey());
         List<Object> listed = new ArrayList<>();
         for (Object o : (List) e.getValue()) {
-            if (fa != null && fa.getSystem() != null) {
+            if (fa != null && fa.getUnit() != null && !fa.getUnit().isBlank()
+                    && fa.getConceptMap() != null) {
+                switch (o) {
+                    case String c -> listed.add(o);
+                    case Map map when map.containsKey("magnitude") && map.containsKey("unit") -> {
+                        String newMagnitude = CxxMdrUnitConvert.convert(Settings.getCxxmdr(), map, fa);
+                        if (newMagnitude != null) {
+                            map.replace("unit", fa.getUnit());
+                            map.replace("magnitude", newMagnitude);
+                            listed.add(new String[] {newMagnitude, fa.getUnit()});
+                        } else {
+                            Logger.error("Could not convert unit");
+                            e.setValue(null);
+                            return;
+                        }
+                    }
+                    default -> {
+                    }
+                }
+            } else if (fa != null && fa.getSystem() != null) {
                 String code = switch (o) {
                     case String c -> c;
                     case Map map -> ((Map<String, String>) map).get("code");
@@ -217,13 +336,13 @@ public final class OpenEhrObds {
                 };
                 if (fa.getConceptMap() == null) {
                     String version = switch (o) {
-                        case String c -> fa.getVersion();
+                        case String ignored -> fa.getVersion();
                         case Map map -> ((Map<String, String>) map).get("version");
                         default -> null;
                     };
                     listed.add(FhirResolver.lookUp(fa.getSystem(), version, code));
                 } else if (fa.getConceptMap() != null) {
-                    listed.add(FhirResolver.conceptMap(fa.getConceptMap(), fa.getId(), fa.getSource(),
+                    listed.add(FhirResolver.conceptMap(fa.getConceptMap(), fa.getSystem(), fa.getSource(),
                             fa.getTarget(), code));
                 }
             } else {
@@ -272,101 +391,133 @@ public final class OpenEhrObds {
         }
     }
 
-    private static Map<String, Object> convertMdr(Set<Map.Entry<String, Object>> xmlSet, Mapping m) {
+    private static Map<String, Object> convertMdr(Set<Entry<String, Object>> xmlSet, Mapping m)
+            throws ProcessingException {
         RelationConvert conv = new RelationConvert();
         conv.setSourceProfileCode(m.getSource());
         conv.setTargetProfileCode(m.getTarget());
         conv.setSourceProfileVersion(m.getSourceVersion());
         conv.setTargetProfileVersion(m.getTargetVersion());
-        conv.setValues(xmlSet.stream()
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue)));
+        conv.setValues(xmlSet.stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue)));
         try {
             return CxxMdrConvert.convert(Settings.getCxxmdr(), conv).getValues();
         } catch (JsonProcessingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            Logger.error(e);
+            throw new ProcessingException(e);
         }
-        return null;
     }
 
     @SuppressWarnings("unchecked")
-    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data) {
+    private static void buildOpenEhrComposition(String templateId, Map<String, Object> data)
+            throws ProcessingException {
+        String ehr;
+        Composition composition;
 
-        String ehr = "";
-        Composition composition = null;
-
-        try (BufferedWriter writer = new BufferedWriter(
-                new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
-
+        try {
             // Write JSON to file
             composition = PARSERS.get(templateId).build(data);
 
             Logger.debug("Finished JSON-Generation. Generating String.");
-
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
-            writer.write(ehr);
 
-        } catch (XPathExpressionException | IOException | ParserConfigurationException | SAXException
-                | JAXBException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        } catch (XPathExpressionException | JsonProcessingException e) {
+            Logger.error(e);
+            throw new ProcessingException(e);
         }
 
-        if ("raw".equals(Settings.getTarget())) {
-            QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                    "SELECT e/ehr_id/value as EHR_ID FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                            + ((List<String>) data.get("ehr_id")).getFirst() + "'"));
-            UUID ehrId = null;
-            if (ehrIds.getRows().size() == 0) {
-                EhrStatus es = new EhrStatus();
-                es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
-                es.setName(new DvText("EHR status"));
-                es.setQueryable(true);
-                es.setModifiable(true);
-                es.setSubject(new PartySelf(new PartyRef(
-                        new HierObjectId(((List<String>) data.get("ehr_id")).getFirst()), "DEMOGRAPHIC", "PERSON")));
-                ehrId = openEhrClient.ehrEndpoint().createEhr(es);
-            } else if (ehrIds.getRows().size() == 1) {
-                ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
-            }
-            openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
+        if (!data.containsKey("ehr_id")) {
+            Logger.error("Found no ehr_id in the mapped object!");
+            throw new ProcessingException();
         }
 
-        if ("xds".equals(Settings.getTarget())) {
-            // XDS Envelope
-
-            try (InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream("iti41.xml")) {
-                assert is != null;
-                String content = new String(is.readAllBytes());
-                content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).getFirst());
-                content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(ehr.getBytes())));
-                content = content.replace("UUID1", UUID.randomUUID().toString());
-                content = content.replace("UUID2", UUID.randomUUID().toString());
-                content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));
-                content = content.replace("DATETIME",
-                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-                BufferedWriter writerXDS = new BufferedWriter(
-                        new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".xml"));
-                writerXDS.write(content);
-                writerXDS.close();
-
-                // XDS Upload
-
-                RestTemplate rt = new RestTemplate();
-                UriComponentsBuilder builder = UriComponentsBuilder
-                        .fromUri(Settings.getXdsUrl());
-
-                HttpHeaders headers = new HttpHeaders();
-                headers.set("Content-Type", "application/xml");
-                headers.set("Accept", "application/xml");
-
-                String xds = rt.postForObject(builder.build().encode().toUri(), new HttpEntity<>(content, headers),
-                        String.class);
-                Logger.debug(xds);
+        if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
+            Logger.debug("Kafka URL is not set, writing compositon to file.");
+            try (BufferedWriter writer = new BufferedWriter(
+                    new FileWriter("fileOutput/" + i++ + "_"
+                            + ((List<String>) data.get("ehr_id")).getFirst() + ".json"))) {
+                writer.write(ehr);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new ProcessingException(e);
             }
         }
+
+        String ehrIdString = ((List<String>) data.get("ehr_id")).getFirst();
+        QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                "SELECT e/ehr_id/value as EHR_ID"
+                        + " FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                        + ehrIdString + "'"));
+        UUID ehrId;
+        if (ehrIds.getRows() == null) {
+            EhrStatus es = new EhrStatus();
+            es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
+            es.setName(new DvText("EHR status"));
+            es.setQueryable(true);
+            es.setModifiable(true);
+            es.setSubject(new PartySelf(new PartyRef(
+                    new HierObjectId(ehrIdString), "DEMOGRAPHIC", "PERSON")));
+            ehrId = openEhrClient.ehrEndpoint().createEhr(es);
+        } else if (ehrIds.getRows().size() == 1) {
+            ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+        } else {
+            Logger.error("Found more than one EHR for ehr_id {}!", ehrIdString);
+            throw new ProcessingException();
+        }
+
+        ObjectVersionId ovi = getVersionUid(templateId, ((List<String>) data.get("cxxId")).getFirst());
+        if (ovi != null) {
+            composition.setUid(ovi);
+        }
+        openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
+    }
+
+    private static void deleteOpenEhrComposition(String templateId, String itemId) throws ProcessingException {
+        if (AQLS.get(templateId).getDeleteAql() == null) {
+            Logger.warn("Cannot delete composition because deleteAql query not set.");
+            return;
+        }
+        QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                String.format(AQLS.get(templateId).getDeleteAql(), templateId,
+                        Settings.getSystemId(), itemId)));
+        if (ehrIds.getRows() == null) {
+            Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
+                    templateId, itemId, Settings.getSystemId());
+            return;
+        }
+
+        if (ehrIds.getRows().size() > 1) {
+            Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
+                    + " This should not happen!", itemId, Settings.getSystemId());
+            throw new ProcessingException();
+        }
+
+        UUID ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+        ObjectVersionId versionId = new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast());
+        Logger.info("Deleting composition {} from ehr {}", versionId, ehrId);
+        openEhrClient.compositionEndpoint(ehrId).delete(versionId);
+        return;
+    }
+
+    private static ObjectVersionId getVersionUid(String templateId, String itemId) throws ProcessingException {
+        if (AQLS.get(templateId).getUpdateAql() == null) {
+            Logger.warn("Cannot update composition because updateAql query not set.");
+            return null;
+        }
+        QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                String.format(AQLS.get(templateId).getUpdateAql(), templateId,
+                        Settings.getSystemId(), itemId)));
+        if (ehrIds.getRows() == null) {
+            Logger.info("No composition found for templateId {}, originalId {} from system: {}",
+                    templateId, itemId, Settings.getSystemId());
+            return null;
+        }
+
+        if (ehrIds.getRows().size() > 1) {
+            Logger.error("Found more than one composition for ID: {} from system: {}!"
+                    + " This should not happen!", itemId, Settings.getSystemId());
+            throw new ProcessingException();
+        }
+
+        return new ObjectVersionId((String) ehrIds.getRows().getFirst().getFirst());
     }
 
 }

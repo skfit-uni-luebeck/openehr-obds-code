@@ -50,9 +50,7 @@ public final class CxxMdrItemSet {
      * @return List of CxxItem
      */
     public static List<CxxItem> getItemList(CxxItemSet itemSet) {
-        List<CxxItem> items = new ArrayList<>();
-        items.addAll(itemSet.getItems());
-        return items;
+        return new ArrayList<>(itemSet.getItems());
     }
 
     /**

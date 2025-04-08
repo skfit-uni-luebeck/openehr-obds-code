@@ -11,6 +11,9 @@ public class MappingAttributes {
     private String id;
     private String code;
     private String version;
+    private String unit;
+    private String updateAql;
+    private String deleteAql;
 
     public MappingAttributes() {
     }
@@ -71,4 +74,27 @@ public class MappingAttributes {
         this.version = version;
     }
 
+    public String getUnit() {
+        return unit;
+    }
+
+    public void setUnit(String unit) {
+        this.unit = unit;
+    }
+
+    public String getUpdateAql() {
+        return updateAql;
+    }
+
+    public void setUpdateAql(String updateAql) {
+        this.updateAql = updateAql;
+    }
+
+    public String getDeleteAql() {
+        return deleteAql;
+    }
+
+    public void setDeleteAql(String deleteAql) {
+        this.deleteAql = deleteAql;
+    }
 }

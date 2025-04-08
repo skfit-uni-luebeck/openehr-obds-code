@@ -1,3 +1,4 @@
+mode:
 cxxmdr:
    url:
    username:
@@ -9,8 +10,15 @@ openEhrUrl:
 openEhrUser:
 openEhrPassword:
 xdsUrl:
-target: raw
-# target: xds
+kafka:
+  clientID:
+  url:
+  group:
+  offset: earliest
+  readTopic:
+  errorTopic:
+  pollDuration:
+  pollRecords:
 mapping:
   /Patient:
     source: obds-patient
@@ -18,4 +26,7 @@ mapping:
     target: openehr-obds-patient
     targetVersion: 1
     split: false
+    templateId:
+    uniqueComposition: false
 depthLimit: 4
+systemId:

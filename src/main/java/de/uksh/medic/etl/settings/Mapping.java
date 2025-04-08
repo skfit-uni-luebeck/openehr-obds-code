@@ -6,11 +6,12 @@ package de.uksh.medic.etl.settings;
 public class Mapping {
 
     private String source;
-    private Integer sourceVersion;
+    private int sourceVersion;
     private String target;
-    private Integer targetVersion;
+    private int targetVersion;
     private boolean split;
     private String templateId;
+    private boolean update;
 
     public String getSource() {
         return source;
@@ -20,11 +21,11 @@ public class Mapping {
         this.source = source;
     }
 
-    public Integer getSourceVersion() {
+    public int getSourceVersion() {
         return sourceVersion;
     }
 
-    public void setSourceVersion(Integer sourceVersion) {
+    public void setSourceVersion(int sourceVersion) {
         this.sourceVersion = sourceVersion;
     }
 
@@ -36,11 +37,11 @@ public class Mapping {
         this.target = target;
     }
 
-    public Integer getTargetVersion() {
+    public int getTargetVersion() {
         return targetVersion;
     }
 
-    public void setTargetVersion(Integer targetVersion) {
+    public void setTargetVersion(int targetVersion) {
         this.targetVersion = targetVersion;
     }
 
@@ -60,4 +61,11 @@ public class Mapping {
         this.templateId = templateId;
     }
 
+    public boolean isUpdate() {
+        return update;
+    }
+
+    public void setUpdate(boolean update) {
+        this.update = update;
+    }
 }

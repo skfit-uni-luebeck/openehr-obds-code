@@ -16,16 +16,35 @@ public final class Settings {
     private static URI openEhrUrl;
     private static String openEhrUser;
     private static String openEhrPassword;
-    private static URI xdsUrl;
-    private static String target;
+    private static String mode;
     private static CxxMdrSettings cxxmdr;
+    private static KafkaSettings kafka;
     private static Map<String, Mapping> mapping;
     private static int depthLimit;
+    private static String systemId;
 
     private Settings() {}
 
     public static URL getFhirTsUrl() {
         return fhirTsUrl;
+    }
+
+    public static String getMode() {
+        return mode;
+    }
+
+    public static String getSystemId() {
+        return systemId;
+    }
+
+    @JsonProperty("systemId")
+    public void setSystemId(String systemId) {
+        Settings.systemId = systemId;
+    }
+
+    @JsonProperty("mode")
+    public void setMode(String mode) {
+        Settings.mode = mode;
     }
 
     @JsonProperty("fhirTsUrl")
@@ -60,24 +79,6 @@ public final class Settings {
         openEhrPassword = newOpenEhrPassword;
     }
 
-    public static URI getXdsUrl() {
-        return xdsUrl;
-    }
-
-    @JsonProperty("xdsUrl")
-    public void setXdsUrl(URI newXdsUrl) {
-        xdsUrl = newXdsUrl;
-    }
-
-    public static String getTarget() {
-        return target;
-    }
-
-    @JsonProperty("target")
-    public void setTarget(String newTarget) {
-        target = newTarget;
-    }
-
     public static CxxMdrSettings getCxxmdr() {
         return cxxmdr;
     }
@@ -85,6 +86,15 @@ public final class Settings {
     @JsonProperty("cxxmdr")
     public void setCxxMdrSettings(CxxMdrSettings newCxxMdr) {
         cxxmdr = newCxxMdr;
+    }
+
+    public static KafkaSettings getKafka() {
+        return kafka;
+    }
+
+    @JsonProperty("kafka")
+    public void setKafkaSettings(KafkaSettings newKafka) {
+        kafka = newKafka;
     }
 
     public static Map<String, Mapping> getMapping() {
