@@ -36,13 +36,21 @@ public enum FhirAttributes {
      */
     VERSION("version"),
     /**
-     * version attribute in MDR.
+     * unit attribute in MDR.
      */
     UNIT("unit"),
     /**
-     * version attribute in MDR.
+     * path attribute in MDR.
      */
-    PATH("path");
+    PATH("path"),
+    /**
+     * updateAql attribute in MDR.
+     */
+    UPDATEAQL("updateAql"),
+    /**
+     * deleteAql attribute in MDR.
+     */
+    DELETEAQL("deleteAql");
 
     private final String label;
 

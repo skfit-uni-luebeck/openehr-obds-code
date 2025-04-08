@@ -16,8 +16,6 @@ public final class Settings {
     private static URI openEhrUrl;
     private static String openEhrUser;
     private static String openEhrPassword;
-    private static URI xdsUrl;
-    private static String target;
     private static String mode;
     private static CxxMdrSettings cxxmdr;
     private static KafkaSettings kafka;
@@ -79,24 +77,6 @@ public final class Settings {
     @JsonProperty("openEhrPassword")
     public void setOpenEhrPassword(String newOpenEhrPassword) {
         openEhrPassword = newOpenEhrPassword;
-    }
-
-    public static URI getXdsUrl() {
-        return xdsUrl;
-    }
-
-    @JsonProperty("xdsUrl")
-    public void setXdsUrl(URI newXdsUrl) {
-        xdsUrl = newXdsUrl;
-    }
-
-    public static String getTarget() {
-        return target != null ? target : "";
-    }
-
-    @JsonProperty("target")
-    public void setTarget(String newTarget) {
-        target = newTarget;
     }
 
     public static CxxMdrSettings getCxxmdr() {

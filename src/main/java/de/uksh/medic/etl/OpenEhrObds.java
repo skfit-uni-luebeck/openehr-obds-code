@@ -31,8 +31,6 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
@@ -55,15 +53,12 @@ import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRes
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.tinylog.Logger;
 
 public final class OpenEhrObds {
 
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
+    private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
     private static DefaultRestClient openEhrClient;
@@ -138,6 +133,12 @@ public final class OpenEhrObds {
                     Logger.error(e);
                 }
             });
+            try {
+                AQLS.put(m.getTemplateId(),
+                CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
+            } catch (URISyntaxException e) {
+                Logger.error(e);
+            }
 
         });
 
@@ -441,137 +442,83 @@ public final class OpenEhrObds {
             }
         }
 
-        switch (Settings.getTarget()) {
-            case "raw":
-                String ehrIdString = ((List<String>) data.get("ehr_id")).getFirst();
-                QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                        "SELECT e/ehr_id/value as EHR_ID"
-                                + " FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                                + ehrIdString + "'"));
-                UUID ehrId;
-                if (ehrIds.getRows() == null) {
-                    EhrStatus es = new EhrStatus();
-                    es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
-                    es.setName(new DvText("EHR status"));
-                    es.setQueryable(true);
-                    es.setModifiable(true);
-                    es.setSubject(new PartySelf(new PartyRef(
-                            new HierObjectId(ehrIdString), "DEMOGRAPHIC", "PERSON")));
-                    ehrId = openEhrClient.ehrEndpoint().createEhr(es);
-                } else if (ehrIds.getRows().size() == 1) {
-                    ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
-                } else {
-                    Logger.error("Found more than one EHR for ehr_id {}!", ehrIdString);
-                    throw new ProcessingException();
-                }
-
-                ObjectVersionId ovi = getVersionUid(templateId, ((List<String>) data.get("cxxId")).getFirst());
-                if (ovi != null) {
-                    composition.setUid(ovi);
-                }
-                openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
-                break;
-            case "xds":
-                // XDS Envelope
-
-                try (InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream("iti41.xml")) {
-                    assert is != null;
-                    String content = new String(is.readAllBytes());
-                    content = content.replaceAll("MPIID", ((List<String>) data.get("ehr_id")).getFirst());
-                    content = content.replaceAll("EHRCONTENT", new String(Base64.getEncoder().encode(ehr.getBytes())));
-                    content = content.replace("UUID1", UUID.randomUUID().toString());
-                    content = content.replace("UUID2", UUID.randomUUID().toString());
-                    content = content.replace("TIMESTAMP", String.valueOf(System.currentTimeMillis()));
-                    content = content.replace("DATETIME",
-                            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-                    BufferedWriter writerXDS = new BufferedWriter(
-                            new FileWriter(i++ + "_" + ((List<String>) data.get("ehr_id")).getFirst() + ".xml"));
-                    writerXDS.write(content);
-                    writerXDS.close();
-
-                    // XDS Upload
-
-                    RestTemplate rt = new RestTemplate();
-                    UriComponentsBuilder builder = UriComponentsBuilder.fromUri(Settings.getXdsUrl());
-
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.set("Content-Type", "application/xml");
-                    headers.set("Accept", "application/xml");
-
-                    String xds = rt.postForObject(builder.build().encode().toUri(), new HttpEntity<>(content, headers),
-                            String.class);
-                    Logger.debug(xds);
-                } catch (IOException e) {
-                    throw new ProcessingException(e);
-                }
-                break;
-            default:
+        String ehrIdString = ((List<String>) data.get("ehr_id")).getFirst();
+        QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                "SELECT e/ehr_id/value as EHR_ID"
+                        + " FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
+                        + ehrIdString + "'"));
+        UUID ehrId;
+        if (ehrIds.getRows() == null) {
+            EhrStatus es = new EhrStatus();
+            es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
+            es.setName(new DvText("EHR status"));
+            es.setQueryable(true);
+            es.setModifiable(true);
+            es.setSubject(new PartySelf(new PartyRef(
+                    new HierObjectId(ehrIdString), "DEMOGRAPHIC", "PERSON")));
+            ehrId = openEhrClient.ehrEndpoint().createEhr(es);
+        } else if (ehrIds.getRows().size() == 1) {
+            ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+        } else {
+            Logger.error("Found more than one EHR for ehr_id {}!", ehrIdString);
+            throw new ProcessingException();
         }
+
+        ObjectVersionId ovi = getVersionUid(templateId, ((List<String>) data.get("cxxId")).getFirst());
+        if (ovi != null) {
+            composition.setUid(ovi);
+        }
+        openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
     }
 
-    private static void deleteOpenEhrComposition(String templateId, String sampleId) throws ProcessingException {
-        switch (Settings.getTarget()) {
-            case "raw":
-                QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                        String.format("SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id "
-                                + "FROM EHR e "
-                                + "CONTAINS COMPOSITION c "
-                                + "WHERE c/name/value = '%s' "
-                                + "AND c/feeder_audit/originating_system_audit/system_id = '%s'"
-                                + " AND c/feeder_audit/originating_system_item_ids/id = '%s'", templateId,
-                                Settings.getSystemId(), sampleId)));
-                if (ehrIds.getRows() == null) {
-                    Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
-                            templateId, sampleId, Settings.getSystemId());
-                    return;
-                }
-
-                if (ehrIds.getRows().size() > 1) {
-                    Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
-                            + " This should not happen!", sampleId, Settings.getSystemId());
-                    throw new ProcessingException();
-                }
-
-                UUID ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
-                ObjectVersionId versionId = new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast());
-                Logger.info("Deleting composition {} from ehr {}", versionId, ehrId);
-                openEhrClient.compositionEndpoint(ehrId).delete(versionId);
-                return;
-            case "xds":
-                return;
-            default:
+    private static void deleteOpenEhrComposition(String templateId, String itemId) throws ProcessingException {
+        if (AQLS.get(templateId).getDeleteAql() == null) {
+            Logger.warn("Cannot delete composition because deleteAql query not set.");
+            return;
         }
+        QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                String.format(AQLS.get(templateId).getDeleteAql(), templateId,
+                        Settings.getSystemId(), itemId)));
+        if (ehrIds.getRows() == null) {
+            Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
+                    templateId, itemId, Settings.getSystemId());
+            return;
+        }
+
+        if (ehrIds.getRows().size() > 1) {
+            Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
+                    + " This should not happen!", itemId, Settings.getSystemId());
+            throw new ProcessingException();
+        }
+
+        UUID ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
+        ObjectVersionId versionId = new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast());
+        Logger.info("Deleting composition {} from ehr {}", versionId, ehrId);
+        openEhrClient.compositionEndpoint(ehrId).delete(versionId);
+        return;
     }
 
-    private static ObjectVersionId getVersionUid(String templateId, String sampleId) throws ProcessingException {
-        switch (Settings.getTarget()) {
-            case "raw":
-                QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
-                        String.format("SELECT c/uid/value AS uid_based_id "
-                                + "FROM EHR e "
-                                + "CONTAINS COMPOSITION c "
-                                + "WHERE c/name/value = '%s' "
-                                + "AND c/feeder_audit/originating_system_audit/system_id = '%s'"
-                                + " AND c/feeder_audit/originating_system_item_ids/id = '%s'", templateId,
-                                Settings.getSystemId(), sampleId)));
-                if (ehrIds.getRows() == null) {
-                    Logger.info("No composition found for templateId {}, originalId {} from system: {}",
-                            templateId, sampleId, Settings.getSystemId());
-                    return null;
-                }
-
-                if (ehrIds.getRows().size() > 1) {
-                    Logger.error("Found more than one composition for ID: {} from system: {}!"
-                            + " This should not happen!", sampleId, Settings.getSystemId());
-                    throw new ProcessingException();
-                }
-
-                return new ObjectVersionId((String) ehrIds.getRows().getFirst().getFirst());
-            case "xds":
-                return null;
-            default:
-                return null;
+    private static ObjectVersionId getVersionUid(String templateId, String itemId) throws ProcessingException {
+        if (AQLS.get(templateId).getUpdateAql() == null) {
+            Logger.warn("Cannot update composition because updateAql query not set.");
+            return null;
         }
+        QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
+                String.format(AQLS.get(templateId).getUpdateAql(), templateId,
+                        Settings.getSystemId(), itemId)));
+        if (ehrIds.getRows() == null) {
+            Logger.info("No composition found for templateId {}, originalId {} from system: {}",
+                    templateId, itemId, Settings.getSystemId());
+            return null;
+        }
+
+        if (ehrIds.getRows().size() > 1) {
+            Logger.error("Found more than one composition for ID: {} from system: {}!"
+                    + " This should not happen!", itemId, Settings.getSystemId());
+            throw new ProcessingException();
+        }
+
+        return new ObjectVersionId((String) ehrIds.getRows().getFirst().getFirst());
     }
 
 }

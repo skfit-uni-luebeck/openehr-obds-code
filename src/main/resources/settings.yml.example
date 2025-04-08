@@ -19,7 +19,6 @@ kafka:
   errorTopic:
   pollDuration:
   pollRecords:
-target:
 mapping:
   /Patient/Meldung/Tumorzuordnung:
     source:

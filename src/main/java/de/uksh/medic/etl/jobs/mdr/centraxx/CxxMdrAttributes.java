@@ -85,4 +85,56 @@ public final class CxxMdrAttributes {
         }
     }
 
+        /**
+     * Retrieves a FhirAttributes object for a specified MDR profiles.
+     *
+     * @param mdr        Configuration for MDR.
+     * @param mdrProfile profile / form / ItemSet where the item is defined
+     * @param key        key of the requested attribute
+     * @return FhirAttributes object
+     * @throws URISyntaxException
+     */
+    public static MappingAttributes getProfileAttributes(CxxMdrSettings mdr, String mdrProfile, String domain)
+            throws URISyntaxException {
+
+        if (mdr.isTokenExpired()) {
+            CxxMdrLogin.login(mdr);
+        }
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.set("code", mdrProfile);
+        form.set("domainCode", domain);
+
+        RestTemplate rt = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUriString(mdr.getUrl() + "/rest/v1/itemsets/attributes/itemset");
+        builder.queryParams(form);
+        headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON.toString());
+        headers.add(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.toString());
+        headers.add("Authorization", "Bearer " + mdr.getToken());
+        try {
+            ResponseEntity<CxxList> response = rt.exchange(builder.build().encode().toUri(), HttpMethod.GET,
+                    new HttpEntity<>(headers), CxxList.class);
+            CxxList l = response.getBody();
+            if (l != null && l.getContent() != null) {
+                MappingAttributes ch = new MappingAttributes();
+                for (CxxAttributeValue av : l.getContent()) {
+                    switch (av.getAttribute()) {
+                        case UPDATEAQL -> ch.setUpdateAql(av.getValue());
+                        case DELETEAQL -> ch.setDeleteAql(av.getValue());
+                        default -> {
+                        }
+                    }
+                }
+                return ch;
+            }
+            return null;
+
+        } catch (final HttpClientErrorException e) {
+            Logger.error("Object " + form.get("itemCode") + " not found in MDR!");
+            return null;
+        }
+    }
+
 }
