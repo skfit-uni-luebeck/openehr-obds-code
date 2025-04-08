@@ -2,11 +2,9 @@ package de.uksh.medic.etl.settings;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.commons.text.lookup.StringLookupFactory;
 
@@ -29,11 +27,10 @@ public class ConfigurationLoader {
      * @param cls Class of POJO representing the yaml file.
      * @return Initialized object of POJO with values from yml and environment
      */
-    @SuppressWarnings("null")
     public <T> T loadConfiguration(InputStream config, Class<T> cls) {
         try {
             String contents = this.stringSubstitutor
-                    .replace(new String(ByteStreams.toByteArray(config), StandardCharsets.UTF_8));
+                    .replace(new String(config.readAllBytes()));
 
             return this.objectMapper.readValue(contents, cls);
         } catch (IOException e) {

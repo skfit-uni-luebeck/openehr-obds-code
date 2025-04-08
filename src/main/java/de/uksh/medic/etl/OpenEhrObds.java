@@ -135,7 +135,7 @@ public final class OpenEhrObds {
             });
             try {
                 AQLS.put(m.getTemplateId(),
-                CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
+                        CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
             } catch (URISyntaxException e) {
                 Logger.error(e);
             }
@@ -280,7 +280,6 @@ public final class OpenEhrObds {
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
                     for (Object b : a) {
-                        Logger.debug(entry.getKey());
                         walkXmlTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
                     }
                 }
