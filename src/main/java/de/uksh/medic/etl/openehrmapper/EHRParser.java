@@ -49,7 +49,7 @@ public class EHRParser {
         }
     }
 
-    public Composition build(Map<String, Object> map)
+    public Composition build(Map<String, Object> map, Map<String, Object> datatypes)
             throws XPathExpressionException {
 
         String pathContent = "//template/definition[rm_type_name = \"COMPOSITION\"]"
@@ -104,14 +104,14 @@ public class EHRParser {
         Map<String, Object> applyMap = g.applyDefaults(map);
         ArrayList<ContentItem> content = new ArrayList<>();
         composition.setContent(content);
-        g.processAttributeChildren(pathContent, composition.getArchetypeNodeId(), content, applyMap);
+        g.processAttributeChildren(pathContent, composition.getArchetypeNodeId(), content, applyMap, datatypes);
 
         EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
                 new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
         composition.setContext(context);
         ItemTree itemTree = new ItemTree();
         context.setOtherContext(itemTree);
-        g.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap);
+        g.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap, datatypes);
 
         return composition;
 

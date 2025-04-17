@@ -29,11 +29,19 @@ import com.nedap.archie.rm.datavalues.quantity.DvOrdinal;
 import com.nedap.archie.rm.datavalues.quantity.DvQuantity;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDate;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
+import com.nedap.archie.rm.datavalues.quantity.datetime.DvDuration;
+import com.nedap.archie.rm.datavalues.quantity.datetime.DvTime;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
+
+import de.uksh.medic.etl.model.MappingAttributes;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.time.Period;
+import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -45,6 +53,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.Quantity;
 import org.tinylog.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
@@ -61,7 +70,7 @@ public class Generator {
     }
 
     public void processAttributeChildren(String path, String name, Object jsonmap,
-            Map<String, Object> map) {
+            Map<String, Object> map, Map<String, Object> datatypes) {
         String newPath = path + "/children";
         if (!cacheNodeList.containsKey(newPath + "/rm_type_name")) {
             XPathExpression expr;
@@ -79,6 +88,12 @@ public class Generator {
                 return;
             }
             String type = "gen_" + children.item(i).getFirstChild().getTextContent();
+            if (datatypes != null && datatypes.containsKey(name) && datatypes.get(name) instanceof MappingAttributes && ((MappingAttributes) datatypes.get(name)).getDatatype() != null) {
+                String type2 = "gen_" + ((MappingAttributes) datatypes.get(name)).getDatatype();
+                if (!type2.equals(type)) {
+                    continue;
+                }
+            }
             if ("gen_STRING".equals(type)) {
                 Logger.debug("Filtered out gen_STRING!");
                 return;
@@ -87,8 +102,8 @@ public class Generator {
             Method met;
             try {
                 met = this.getClass().getMethod(type, String.class, String.class, Object.class,
-                        Map.class);
-                met.invoke(this, newPath + "[" + (i + 1) + "]", name, jsonmap, map);
+                        Map.class, Map.class);
+                met.invoke(this, newPath + "[" + (i + 1) + "]", name, jsonmap, map, datatypes);
             } catch (NoSuchMethodException | SecurityException | IllegalAccessException | InvocationTargetException e) {
                 Logger.error(e);
             }
@@ -99,7 +114,8 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/ehr.html#_class_descriptions_4
 
     @SuppressWarnings("unchecked")
-    public void gen_SECTION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_SECTION(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String label = getTypeLabel(path, getNodeId(path));
@@ -111,7 +127,8 @@ public class Generator {
         section.setNameAsString(label);
         List<ContentItem> items = new ArrayList<>();
         processAttributeChildren(newPath, paramName, items,
-                (Map<String, Object>) map.getOrDefault(resolvedPath, map.get(paramName)));
+                (Map<String, Object>) map.getOrDefault(resolvedPath, map.get(paramName)),
+                (Map<String, Object>) datatypes.getOrDefault(resolvedPath, map.get(paramName)));
         section.setItems(items);
 
         ((List<ContentItem>) jsonmap).add(section);
@@ -121,7 +138,8 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/ehr.html#_class_descriptions_5
 
     @SuppressWarnings("unchecked")
-    public void gen_ADMIN_ENTRY(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ADMIN_ENTRY(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -146,7 +164,7 @@ public class Generator {
             adminEntry.setSubject(new PartySelf());
 
             ItemTree itemTree = new ItemTree();
-            processAttributeChildren(oap, paramName, itemTree, le);
+            processAttributeChildren(oap, paramName, itemTree, le, (Map<String, Object>) map.get(paramName));
             adminEntry.setData(itemTree);
             if (oa) {
                 ((ArrayList<ContentItem>) jsonmap).add(adminEntry);
@@ -155,7 +173,8 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public void gen_OBSERVATION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_OBSERVATION(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -180,7 +199,7 @@ public class Generator {
             observation.setSubject(new PartySelf());
 
             History<ItemStructure> history = new History<>();
-            processAttributeChildren(oap, paramName, history, le);
+            processAttributeChildren(oap, paramName, history, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             observation.setData(history);
             if (oa) {
                 ((List<ContentItem>) jsonmap).add(observation);
@@ -189,7 +208,8 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public void gen_EVALUATION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_EVALUATION(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -218,7 +238,7 @@ public class Generator {
             evaluation.setSubject(new PartySelf());
 
             ItemTree data = new ItemTree();
-            processAttributeChildren(oap, paramName, data, le);
+            processAttributeChildren(oap, paramName, data, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             evaluation.setData(data);
             if (oa) {
                 ((List<ContentItem>) jsonmap).add(evaluation);
@@ -228,7 +248,8 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public void gen_INSTRUCTION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_INSTRUCTION(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oapActivities = path + "/attributes[rm_attribute_name=\"activities\"]";
@@ -257,8 +278,8 @@ public class Generator {
 
             List<Activity> activities = new ArrayList<>();
             ItemTree protocol = new ItemTree();
-            processAttributeChildren(oapActivities, paramName, activities, le);
-            processAttributeChildren(oapProtocol, paramName, protocol, le);
+            processAttributeChildren(oapActivities, paramName, activities, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oapProtocol, paramName, protocol, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             instruction.setActivities(activities);
             instruction.setProtocol(protocol);
             if (oaActivities || oaProtocol) {
@@ -268,7 +289,8 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public void gen_ACTIVITY(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ACTIVITY(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String nodeId = getNodeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"description\"]";
@@ -290,7 +312,7 @@ public class Generator {
             activity.setNameAsString(label);
 
             ItemTree itemTree = new ItemTree();
-            processAttributeChildren(oap, name, itemTree, le);
+            processAttributeChildren(oap, name, itemTree, le, (Map<String, Object>) datatypes.getOrDefault(nodeId, new HashMap<>()));
             activity.setDescription(itemTree);
             if (oa) {
                 ((ArrayList<Activity>) jsonmap).add(activity);
@@ -299,7 +321,8 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oapDescription = path + "/attributes[rm_attribute_name=\"description\"]";
@@ -330,8 +353,8 @@ public class Generator {
             action.setTime(new DvDateTime(((List<String>) le.get("time")).getFirst()));
             ItemTree description = new ItemTree();
             ItemTree protocol = new ItemTree();
-            processAttributeChildren(oapDescription, paramName, description, le);
-            processAttributeChildren(oapProtocol, paramName, protocol, le);
+            processAttributeChildren(oapDescription, paramName, description, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oapProtocol, paramName, protocol, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             action.setDescription(description);
             action.setProtocol(protocol);
 
@@ -351,7 +374,8 @@ public class Generator {
 
     // ITEM_TABLE
 
-    public void gen_ITEM_TREE(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ITEM_TREE(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         if (!cache.containsKey(path + "/../rm_attribute_name")) {
             XPathExpression expr = XP.compile(path + "/../rm_attribute_name");
@@ -369,7 +393,7 @@ public class Generator {
         itemTree.setNameAsString("data"); // fix name
         ArrayList<Item> items = new ArrayList<>();
         itemTree.setItems(items);
-        processAttributeChildren(newPath, name, items, map);
+        processAttributeChildren(newPath, name, items, map, datatypes);
     }
 
     // Representation Class descriptions
@@ -377,7 +401,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_CLUSTER(String path, String name, Object jsonmap,
-            Map<String, Object> map)
+            Map<String, Object> map, Map<String, Object> datatypes)
             throws Exception {
         if (!cache.containsKey(path + "/archetype_id")) {
             XPathExpression expr = XP.compile(path + "/archetype_id");
@@ -409,7 +433,7 @@ public class Generator {
             cluster.setArchetypeNodeId(aNodeId);
             cluster.setNameAsString(label);
             ArrayList<Item> items = new ArrayList<>();
-            processAttributeChildren(newPath, paramName, items, le);
+            processAttributeChildren(newPath, paramName, items, le, (Map<String, Object>) datatypes.getOrDefault(usedCode, new HashMap<>()));
             cluster.setItems(items);
             ((ArrayList<Object>) jsonmap).add(cluster);
 
@@ -417,7 +441,8 @@ public class Generator {
     }
 
     @SuppressWarnings("unchecked")
-    public void gen_ELEMENT(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_ELEMENT(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String nodeId = getNodeId(path);
         String newPath = path + "/attributes[rm_attribute_name = \"value\"]";
@@ -446,7 +471,7 @@ public class Generator {
             if (e instanceof Map || e instanceof List) {
                 return;
             }
-            processAttributeChildren(newPath, nodeId, el, mo);
+            processAttributeChildren(newPath, nodeId, el, mo, datatypes);
             ((ArrayList<Element>) jsonmap).add(el);
 
         });
@@ -456,7 +481,8 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_structures.html#_class_descriptions_4
 
     @SuppressWarnings("unchecked")
-    public void gen_HISTORY(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_HISTORY(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
@@ -468,11 +494,12 @@ public class Generator {
 
         history.setOrigin(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
 
-        processAttributeChildren(newPath, nodeId, history, map);
+        processAttributeChildren(newPath, nodeId, history, map, datatypes);
     }
 
     @SuppressWarnings("unchecked")
-    public void gen_EVENT(String path, String name, Object jsonmap, Map<String, Object> map)
+    public void gen_EVENT(String path, String name, Object jsonmap, Map<String, Object> map,
+            Map<String, Object> datatypes)
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
@@ -484,7 +511,7 @@ public class Generator {
 
         events.setTime(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
         ItemTree itemTree = new ItemTree();
-        processAttributeChildren(newPath, nodeId, itemTree, map);
+        processAttributeChildren(newPath, nodeId, itemTree, map, datatypes);
         events.setData(itemTree);
 
         ((History<ItemStructure>) jsonmap).addEvent(events);
@@ -497,14 +524,14 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions
 
     public void gen_DV_BOOLEAN(String path, String name, Object jsonmap,
-            Map<String, Boolean> map) {
+            Map<String, Boolean> map, Map<String, Object> datatypes) {
         ((Element) jsonmap).setValue(new DvBoolean(map.get(name)));
     }
 
     // DV_STATE
 
     public void gen_DV_IDENTIFIER(String path, String name, Object jsonmap,
-            Map<String, Object> map) {
+            Map<String, Object> map, Map<String, Object> datatypes) {
         DvIdentifier id = new DvIdentifier();
         id.setId(String.valueOf(map.get(name)));
         ((Element) jsonmap).setValue(id);
@@ -514,7 +541,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_2
 
     public void gen_DV_TEXT(String path, String name, Object jsonmap,
-            Map<String, String> map) {
+            Map<String, String> map, Map<String, Object> datatypes) throws Exception {
         if (!map.containsKey(name)) {
             return;
         }
@@ -526,7 +553,7 @@ public class Generator {
     // CODE_PHRASE
 
     public void gen_DV_CODED_TEXT(String path, String name, Object jsonmap,
-            Map<String, Object> map) throws Exception {
+            Map<String, Object> map, Map<String, Object> datatypes) throws Exception {
 
         DvCodedText ct = new DvCodedText();
         switch (map.get(name)) {
@@ -583,7 +610,7 @@ public class Generator {
     // REFERENCE_RANGE
 
     public void gen_DV_ORDINAL(String path, String name, Object jsonmap,
-            Map<String, String> map) throws Exception {
+            Map<String, String> map, Map<String, Object> datatypes) throws Exception {
         DvOrdinal dvo = new DvOrdinal();
         Long value = Long.valueOf(map.get(name));
         dvo.setValue(value);
@@ -600,7 +627,7 @@ public class Generator {
     // DV_AMOUNT
 
     public void gen_DV_QUANTITY(String path, String name, Object jsonmap,
-            Map<String, Object> map) {
+            Map<String, Object> map, Map<String, Object> datatypes) {
 
         switch (map.get(name)) {
             case String s -> {
@@ -623,7 +650,7 @@ public class Generator {
     }
 
     public void gen_DV_COUNT(String path, String name, Object jsonmap,
-            Map<String, Long> map) {
+            Map<String, Long> map, Map<String, Object> datatypes) {
         ((Element) jsonmap).setValue(new DvCount(map.get(name)));
     }
 
@@ -637,14 +664,14 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_4
 
     public void gen_DV_DATE(String path, String name, Object jsonmap,
-            Map<String, String> map) {
+            Map<String, String> map, Map<String, Object> datatypes) {
         ((Element) jsonmap).setValue(new DvDate(map.get(name)));
     }
 
     // DV_TIME
 
     public void gen_DV_DATE_TIME(String path, String name, Object jsonmap,
-            Map<String, String> map) {
+            Map<String, String> map, Map<String, Object> datatypes) {
         ((Element) jsonmap).setValue(new DvDateTime(map.get(name)));
     }
 
@@ -668,7 +695,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_7
 
     public void gen_DV_URI(String path, String name, Object jsonmap,
-            Map<String, Object> map) {
+            Map<String, Object> map, Map<String, Object> datatypes) {
         ((Element) jsonmap).setValue(new DvURI(String.valueOf(map.get(name))));
     }
 
@@ -862,7 +889,6 @@ public class Generator {
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static List merge(List list1, List list2) {
-        list2.removeAll(list1);
         list1.addAll(list2);
         return list1;
     }
