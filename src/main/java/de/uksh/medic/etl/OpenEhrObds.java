@@ -66,6 +66,7 @@ public final class OpenEhrObds {
     private static DefaultRestClient openEhrClient;
     private static Map<String, Object> openehrDatatypes = new HashMap<>();
     private static FhirResolver fr;
+    private static UtilMethods um = new UtilMethods();
     private static IGenericClient fc;
 
     private OpenEhrObds() {
@@ -119,7 +120,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testData/meona/order").listFiles();
+            File[] files = new File("testInput").listFiles();
             for (File f : files) {
                 walkTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
                 }).entrySet(), 1, "", new LinkedHashMap<>());
@@ -235,9 +236,10 @@ public final class OpenEhrObds {
         b.setVariable("path", path);
         b.setVariable("fhirClient", fc);
         b.setVariable("fhirResolver", fr);
+        b.setVariable("utils", um);
 
         if (Settings.getDev()) {
-            return javaMap(xmlSet, path, fc, fr);
+            return javaMap(xmlSet, path, fc, fr, um);
         } else {
             try {
                 File groovyFile = new File("scripts", templateId + ".groovy");
@@ -253,7 +255,7 @@ public final class OpenEhrObds {
     }
 
     public static Map<String, Object> javaMap(Set<Entry<String, Object>> xmlSet, String path, IGenericClient fhirClient,
-            FhirResolver fhirResolver) {
+            FhirResolver fhirResolver, UtilMethods utils) {
         return null;
     }
 
