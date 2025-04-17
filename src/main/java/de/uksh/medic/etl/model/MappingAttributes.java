@@ -14,6 +14,7 @@ public class MappingAttributes {
     private String unit;
     private String updateAql;
     private String deleteAql;
+    private String datatype;
 
     public MappingAttributes() {
     }
@@ -96,5 +97,13 @@ public class MappingAttributes {
 
     public void setDeleteAql(String deleteAql) {
         this.deleteAql = deleteAql;
+    }
+
+    public String getDatatype() {
+        return datatype;
+    }
+
+    public void setDatatype(String datatype) {
+        this.datatype = datatype;
     }
 }

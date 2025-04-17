@@ -62,6 +62,9 @@ public final class CxxMdrAttributes {
             if (l != null && l.getContent() != null) {
                 MappingAttributes ch = new MappingAttributes();
                 for (CxxAttributeValue av : l.getContent()) {
+                    if (av.getAttribute() == null) {
+                        continue;
+                    }
                     switch (av.getAttribute()) {
                         case SYSTEM -> ch.setSystem(new URI(av.getValue()));
                         case SOURCE -> ch.setSource(new URI(av.getValue()));
@@ -71,6 +74,7 @@ public final class CxxMdrAttributes {
                         case CODE -> ch.setCode(av.getValue());
                         case VERSION -> ch.setVersion(av.getValue());
                         case UNIT -> ch.setUnit(av.getValue());
+                        case DATATYPE -> ch.setDatatype(av.getValue());
                         default -> {
                         }
                     }

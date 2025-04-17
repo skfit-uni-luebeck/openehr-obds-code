@@ -50,7 +50,11 @@ public enum FhirAttributes {
     /**
      * deleteAql attribute in MDR.
      */
-    DELETEAQL("deleteAql");
+    DELETEAQL("deleteAql"),
+    /**
+     * datatype attribute in MDR.
+     */
+    DATATYPE("datatype");
 
     private final String label;
 
