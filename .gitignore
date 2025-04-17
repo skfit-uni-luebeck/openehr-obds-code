@@ -36,3 +36,10 @@ settings.yml
 
 ### Test data files ###
 file_*.xml
+testData/*
+testInput/*
+
+### mapping scripts ###
+scripts/*.groovy
+templates/*.opt
+fileOutput/*
