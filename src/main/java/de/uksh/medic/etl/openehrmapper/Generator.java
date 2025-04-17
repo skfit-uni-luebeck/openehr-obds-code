@@ -668,7 +668,10 @@ public class Generator {
         ((Element) jsonmap).setValue(new DvDate(map.get(name)));
     }
 
-    // DV_TIME
+    public void gen_DV_TIME(String path, String name, Object jsonmap,
+            Map<String, String> map, Map<String, Object> datatypes) {
+        ((Element) jsonmap).setValue(new DvTime(map.get(name)));
+    }
 
     public void gen_DV_DATE_TIME(String path, String name, Object jsonmap,
             Map<String, String> map, Map<String, Object> datatypes) {
