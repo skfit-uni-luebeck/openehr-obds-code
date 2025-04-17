@@ -496,6 +496,12 @@ public class Generator {
         history.setNameAsString(label);
 
         history.setOrigin(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
+        if (map.containsKey("events_end")) {
+            ZonedDateTime zdt1 = ZonedDateTime.parse(((List<String>) map.get("events_time")).getFirst() + "Z");
+            ZonedDateTime zdt2 = ZonedDateTime.parse(((List<String>) map.get("events_end")).getFirst() + "Z");
+            history.setDuration(
+                    new DvDuration((TemporalAmount) Period.between(zdt1.toLocalDate(), zdt2.toLocalDate())));
+        }
 
         processAttributeChildren(newPath, nodeId, history, map, datatypes);
     }
