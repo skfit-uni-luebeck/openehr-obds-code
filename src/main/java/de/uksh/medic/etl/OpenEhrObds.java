@@ -1,5 +1,7 @@
 package de.uksh.medic.etl;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.client.api.IGenericClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +22,8 @@ import de.uksh.medic.etl.model.mdr.centraxx.CxxItemSet;
 import de.uksh.medic.etl.model.mdr.centraxx.RelationConvert;
 import de.uksh.medic.etl.openehrmapper.EHRParser;
 import de.uksh.medic.etl.settings.*;
+import groovy.lang.Binding;
+import groovy.lang.GroovyShell;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -48,6 +52,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.xmlbeans.XmlException;
 import org.apache.xmlbeans.XmlOptions;
+import org.codehaus.groovy.control.CompilationFailedException;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
@@ -65,6 +70,7 @@ public final class OpenEhrObds {
     private static DefaultRestClient openEhrClient;
     private static Map<String, Object> openehrDatatypes = new HashMap<>();
     private static FhirResolver fr;
+    private static IGenericClient fhirClient;
 
     private OpenEhrObds() {
     }
@@ -79,6 +85,7 @@ public final class OpenEhrObds {
         configLoader.loadConfiguration(settingsYaml, Settings.class);
 
         fr = new FhirResolver();
+        fhirClient = FhirContext.forR4().newRestfulGenericClient(Settings.getFhirServerUrl().toString());
         CxxMdrSettings mdrSettings = Settings.getCxxmdr();
         if (mdrSettings != null) {
             CxxMdrLogin.login(mdrSettings);
@@ -245,6 +252,28 @@ public final class OpenEhrObds {
         return producerConfig;
     }
 
+
+    public static Map<String, Object> localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path) {
+        Binding b = new Binding();
+        GroovyShell s = new GroovyShell(b);
+        b.setVariable("xmlSet", xmlSet);
+        b.setVariable("fhirClient", fhirClient);
+        b.setVariable("fhirResolver", fr);
+
+        Map<String, Object> i = (Map<String, Object>) xmlSet.stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+
+        try {
+            File groovyFile = new File("scripts/", templateId + ".groovy");
+            if (groovyFile.exists()) {
+                return (Map<String, Object>) s.evaluate(groovyFile);
+            }
+        } catch (CompilationFailedException | IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return xmlSet.stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+    }
+
     @SuppressWarnings({ "unchecked" })
     public static void walkXmlTree(Set<Entry<String, Object>> xmlSet, int depth, String path,
             Map<String, Object> resMap) {
@@ -261,7 +290,7 @@ public final class OpenEhrObds {
         if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSource() != null) {
             Mapping m = Settings.getMapping().get(path);
 
-            Map<String, Object> mapped = new HashMap<>();
+            Map<String, Object> mapped = localMap(xmlSet, m.getTemplateId(), path);
             // ToDo: Add Switch!
             if (Settings.getCxxmdr() != null) {
                 mapped.putAll(convertMdr(xmlSet, m));

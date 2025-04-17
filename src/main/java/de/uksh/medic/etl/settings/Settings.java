@@ -13,6 +13,7 @@ import java.util.Map;
 public final class Settings {
 
     private static URL fhirTsUrl;
+    private static URL fhirServerUrl;
     private static URI openEhrUrl;
     private static String openEhrUser;
     private static String openEhrPassword;
@@ -27,6 +28,10 @@ public final class Settings {
 
     public static URL getFhirTsUrl() {
         return fhirTsUrl;
+    }
+
+    public static URL getFhirServerUrl() {
+        return fhirServerUrl;
     }
 
     public static String getMode() {
@@ -50,6 +55,11 @@ public final class Settings {
     @JsonProperty("fhirTsUrl")
     public void setFhirTsUrl(URL newFhirTsUrl) {
         fhirTsUrl = newFhirTsUrl;
+    }
+
+    @JsonProperty("fhirServerUrl")
+    public void setFhirServerUrl(URL newFhirServerUrl) {
+        fhirServerUrl = newFhirServerUrl;
     }
 
     public static URI getOpenEhrUrl() {
