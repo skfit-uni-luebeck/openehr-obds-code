@@ -421,7 +421,10 @@ public class Generator {
         String label = getLabel(path, nodeId, paramName);
 
         List<Map<String, Object>> l;
-        if (map.containsKey(aNodeId) && map.get(aNodeId) instanceof List) {
+        String usedCode = map.containsKey(aNodeId) ? aNodeId : code;
+        if (!map.containsKey(aNodeId)) {
+            l = (List<Map<String, Object>>) map.get(code);
+        } else if (map.get(aNodeId) instanceof List) {
             l = (List<Map<String, Object>>) map.get(aNodeId);
         } else {
             l = List.of((Map<String, Object>) map.get(aNodeId));
