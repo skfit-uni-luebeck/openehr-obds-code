@@ -771,7 +771,17 @@ public class Generator {
             XPathExpression expr = XP.compile(newPath);
             cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
+        if (!"".equals(cache.get(newPath))) {
+            return cache.get(newPath);
+        }
+
+        newPath = path + "/../../../../term_definitions[@code=\"" + code + "\"]/items[@id=\"text\"]";
+        if (!cache.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
         return cache.get(newPath);
+
     }
 
     private String getLocalTerminologyTerm(String archetype, String nodeId, String code) throws Exception {
