@@ -650,6 +650,11 @@ public class Generator {
                 DvQuantity dvq = new DvQuantity(units, Double.valueOf(magnitude), precision);
                 ((Element) jsonmap).setValue(dvq);
             }
+            case Quantity q -> {
+                DvQuantity dvq = new DvQuantity(q.getUnit(), q.getValue().doubleValue(),
+                        Long.valueOf(q.getValue().precision()));
+                ((Element) jsonmap).setValue(dvq);
+            }
             default -> {
             }
         }
