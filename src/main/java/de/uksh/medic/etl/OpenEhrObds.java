@@ -175,11 +175,11 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File f = new File("PUTbundleHEB.json");
-            // File f = new File("op.xml");
-
-            walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
-            }).entrySet(), 1, "", new LinkedHashMap<>());
+            File[] files = new File("testInput").listFiles();
+            for (File f : files) {
+                walkXmlTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
+                }).entrySet(), 1, "", new LinkedHashMap<>());
+            }
             System.exit(0);
         }
 
