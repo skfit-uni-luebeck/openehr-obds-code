@@ -919,6 +919,7 @@ public class Generator {
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static List merge(List list1, List list2) {
+        list1.clear();
         list1.addAll(list2);
         return list1;
     }

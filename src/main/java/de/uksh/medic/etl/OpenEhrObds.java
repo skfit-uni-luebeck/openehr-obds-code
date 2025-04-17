@@ -390,10 +390,18 @@ public final class OpenEhrObds {
     private static void splitMap(Object value, List<String> key, Map<String, Object> out) {
         if (key.size() > 1) {
             String k = key.removeFirst();
-            Map<String, Object> m = (Map<String, Object>) out.getOrDefault(k,
-                    new LinkedHashMap<>());
-            out.put(k, m);
-            splitMap(value, key, m);
+            if (!(out.get(k) instanceof List)) {
+                Map<String, Object> m = (Map<String, Object>) out.getOrDefault(k,
+                        new LinkedHashMap<>());
+                out.put(k, m);
+                splitMap(value, key, m);
+
+            } else {
+                List<Map<String, Object>> l = (List<Map<String, Object>>) out.get(k);
+                Map<String, Object> m = l.get(0);
+                out.put(k, m);
+                splitMap(value, key, m);
+            }
         } else if (key.size() == 1 && !out.containsKey(key.getFirst())) {
             out.put(key.removeFirst(), value);
         } else if (key.size() == 1 && out.containsKey(key.getFirst())) {
