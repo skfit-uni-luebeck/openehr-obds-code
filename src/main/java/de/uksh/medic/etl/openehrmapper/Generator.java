@@ -541,11 +541,14 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_2
 
     public void gen_DV_TEXT(String path, String name, Object jsonmap,
-            Map<String, String> map, Map<String, Object> datatypes) throws Exception {
+            Map<String, Object> map, Map<String, Object> datatypes) throws Exception {
         if (!map.containsKey(name)) {
             return;
+        } else if (map.get(name) instanceof Coding) {
+            gen_DV_CODED_TEXT(path, name, jsonmap, map, datatypes);
+        } else {
+            ((Element) jsonmap).setValue(new DvText((String) map.get(name)));
         }
-        ((Element) jsonmap).setValue(new DvText(map.get(name)));
     }
 
     // TERM_MAPPING
