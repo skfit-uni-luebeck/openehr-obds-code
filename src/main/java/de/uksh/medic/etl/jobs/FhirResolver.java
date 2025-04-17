@@ -17,18 +17,15 @@ public final class FhirResolver {
     private static final FhirContext CTX = FhirContext.forR4();
     private static IGenericClient terminologyClient;
 
-    private FhirResolver() {
-    }
-
     /**
      * Initializes the class by creating clients for clinical data and terminology.
      */
-    public static void initialize() {
+    public FhirResolver() {
         if (Settings.getFhirTsUrl() != null) {
             terminologyClient = CTX.newRestfulGenericClient(Settings.getFhirTsUrl().toString());
         }
     }
-
+    
     public static Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
         Parameters params = new Parameters();
         params.addParameter("system", new UriType(system));

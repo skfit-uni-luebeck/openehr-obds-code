@@ -64,6 +64,7 @@ public final class OpenEhrObds {
     private static Integer i = 0;
     private static DefaultRestClient openEhrClient;
     private static Map<String, Object> openehrDatatypes = new HashMap<>();
+    private static FhirResolver fr;
 
     private OpenEhrObds() {
     }
@@ -77,7 +78,7 @@ public final class OpenEhrObds {
         ConfigurationLoader configLoader = new ConfigurationLoader();
         configLoader.loadConfiguration(settingsYaml, Settings.class);
 
-        FhirResolver.initialize();
+        fr = new FhirResolver();
         CxxMdrSettings mdrSettings = Settings.getCxxmdr();
         if (mdrSettings != null) {
             CxxMdrLogin.login(mdrSettings);
