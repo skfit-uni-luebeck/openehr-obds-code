@@ -25,8 +25,8 @@ public final class FhirResolver {
             terminologyClient = CTX.newRestfulGenericClient(Settings.getFhirTsUrl().toString());
         }
     }
-    
-    public static Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
+
+    public Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
         Parameters params = new Parameters();
         params.addParameter("system", new UriType(system));
         params.addParameter("source", new UriType(source));
@@ -63,7 +63,7 @@ public final class FhirResolver {
         return new Coding();
     }
 
-    public static Coding lookUp(URI system, String version, String code) {
+    public Coding lookUp(URI system, String version, String code) {
         Parameters params = new Parameters();
         params.addParameter("system", new UriType(system));
         params.addParameter("code", code);

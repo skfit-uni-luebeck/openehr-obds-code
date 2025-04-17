@@ -23,6 +23,7 @@ public final class Settings {
     private static Map<String, Mapping> mapping;
     private static int depthLimit;
     private static String systemId;
+    private static boolean dev;
 
     private Settings() {}
 
@@ -123,6 +124,15 @@ public final class Settings {
     @JsonProperty("depthLimit")
     public void setDepthLimit(int newDepthLimit) {
         depthLimit = newDepthLimit;
+    }
+
+    public static boolean getDev() {
+        return dev;
+    }
+
+    @JsonProperty("dev")
+    public void setDev(boolean newDev) {
+        dev = newDev;
     }
 
 }

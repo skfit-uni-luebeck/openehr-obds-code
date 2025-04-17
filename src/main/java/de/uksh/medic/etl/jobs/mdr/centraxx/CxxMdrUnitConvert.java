@@ -26,7 +26,7 @@ public final class CxxMdrUnitConvert {
      * @param ma MappingAttributes object
      * @return Converted value or null if an error occured
      */
-    public static String[] convert(CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
+    public static String[] convert(FhirResolver fr, CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
         if (!map.containsKey("magnitude") || !map.containsKey("unit")
                 || map.get("magnitude") == null || map.get("unit") == null
                 || map.get("magnitude").isBlank() || map.get("unit").isBlank()) {
@@ -36,7 +36,7 @@ public final class CxxMdrUnitConvert {
         String convertedUnit = null;
 
         if (ma.getConceptMap() != null && ma.getTarget() != null && ma.getSystem() != null && ma.getSource() != null) {
-            Coding coding = FhirResolver.conceptMap(ma.getConceptMap(), ma.getSystem(), ma.getSource(),
+            Coding coding = fr.conceptMap(ma.getConceptMap(), ma.getSystem(), ma.getSource(),
                     ma.getTarget(), map.get("unit"));
             if (coding == null || coding.getCode() == null || coding.getCode().isBlank()) {
                 return null;

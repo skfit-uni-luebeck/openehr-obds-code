@@ -34,9 +34,7 @@ import com.nedap.archie.rm.datavalues.quantity.datetime.DvTime;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
-
 import de.uksh.medic.etl.model.MappingAttributes;
-
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Period;
@@ -88,7 +86,8 @@ public class Generator {
                 return;
             }
             String type = "gen_" + children.item(i).getFirstChild().getTextContent();
-            if (datatypes != null && datatypes.containsKey(name) && datatypes.get(name) instanceof MappingAttributes && ((MappingAttributes) datatypes.get(name)).getDatatype() != null) {
+            if (datatypes != null && datatypes.containsKey(name) && datatypes.get(name) instanceof MappingAttributes
+                    && ((MappingAttributes) datatypes.get(name)).getDatatype() != null) {
                 String type2 = "gen_" + ((MappingAttributes) datatypes.get(name)).getDatatype();
                 if (!type2.equals(type)) {
                     continue;
@@ -199,7 +198,8 @@ public class Generator {
             observation.setSubject(new PartySelf());
 
             History<ItemStructure> history = new History<>();
-            processAttributeChildren(oap, paramName, history, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oap, paramName, history, le,
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             observation.setData(history);
             if (oa) {
                 ((List<ContentItem>) jsonmap).add(observation);
@@ -238,7 +238,8 @@ public class Generator {
             evaluation.setSubject(new PartySelf());
 
             ItemTree data = new ItemTree();
-            processAttributeChildren(oap, paramName, data, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oap, paramName, data, le,
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             evaluation.setData(data);
             if (oa) {
                 ((List<ContentItem>) jsonmap).add(evaluation);
@@ -278,8 +279,10 @@ public class Generator {
 
             List<Activity> activities = new ArrayList<>();
             ItemTree protocol = new ItemTree();
-            processAttributeChildren(oapActivities, paramName, activities, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            processAttributeChildren(oapProtocol, paramName, protocol, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oapActivities, paramName, activities, le,
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oapProtocol, paramName, protocol, le,
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             instruction.setActivities(activities);
             instruction.setProtocol(protocol);
             if (oaActivities || oaProtocol) {
@@ -312,7 +315,8 @@ public class Generator {
             activity.setNameAsString(label);
 
             ItemTree itemTree = new ItemTree();
-            processAttributeChildren(oap, name, itemTree, le, (Map<String, Object>) datatypes.getOrDefault(nodeId, new HashMap<>()));
+            processAttributeChildren(oap, name, itemTree, le,
+                    (Map<String, Object>) datatypes.getOrDefault(nodeId, new HashMap<>()));
             activity.setDescription(itemTree);
             if (oa) {
                 ((ArrayList<Activity>) jsonmap).add(activity);
@@ -353,8 +357,10 @@ public class Generator {
             action.setTime(new DvDateTime(((List<String>) le.get("time")).getFirst()));
             ItemTree description = new ItemTree();
             ItemTree protocol = new ItemTree();
-            processAttributeChildren(oapDescription, paramName, description, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            processAttributeChildren(oapProtocol, paramName, protocol, le, (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oapDescription, paramName, description, le,
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            processAttributeChildren(oapProtocol, paramName, protocol, le,
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             action.setDescription(description);
             action.setProtocol(protocol);
 
@@ -436,7 +442,8 @@ public class Generator {
             cluster.setArchetypeNodeId(aNodeId);
             cluster.setNameAsString(label);
             ArrayList<Item> items = new ArrayList<>();
-            processAttributeChildren(newPath, paramName, items, le, (Map<String, Object>) datatypes.getOrDefault(usedCode, new HashMap<>()));
+            processAttributeChildren(newPath, paramName, items, le,
+                    (Map<String, Object>) datatypes.getOrDefault(usedCode, new HashMap<>()));
             cluster.setItems(items);
             ((ArrayList<Object>) jsonmap).add(cluster);
 

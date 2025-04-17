@@ -65,15 +65,14 @@ public class EHRParser {
         composition.setArchetypeNodeId(
                 ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING)).trim());
 
-        
         String name = ((String) xp.evaluate(
-            "//template/definition/attributes[rm_attribute_name = \"name\"]/children/attributes"
-            + "[rm_attribute_name = \"value\"]/children/item/list/text()",
-            doc, XPathConstants.STRING)).trim();
+                "//template/definition/attributes[rm_attribute_name = \"name\"]/children/attributes"
+                        + "[rm_attribute_name = \"value\"]/children/item/list/text()",
+                doc, XPathConstants.STRING)).trim();
         if ("".equals(name)) {
             name = ((String) xp.evaluate(
-                "//template/definition/template_id/value/text()",
-                doc, XPathConstants.STRING)).trim();
+                    "//template/definition/template_id/value/text()",
+                    doc, XPathConstants.STRING)).trim();
         }
         composition.setNameAsString(name);
 
@@ -94,7 +93,7 @@ public class EHRParser {
         Logger.debug("Setting Feeder_Audit System-ID to {}", Settings.getSystemId());
         FeederAuditDetails details = new FeederAuditDetails(Settings.getSystemId());
 
-        List<String> list = (List<String>) map.get("cxxId");
+        List<String> list = (List<String>) map.get("identifier");
         FeederAudit audit;
 
         if (list != null && !list.isEmpty()) {
