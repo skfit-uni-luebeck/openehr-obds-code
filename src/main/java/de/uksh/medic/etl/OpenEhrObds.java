@@ -58,10 +58,12 @@ import org.tinylog.Logger;
 public final class OpenEhrObds {
 
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
+    private static final Map<String, Object> OPENEHR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
     private static DefaultRestClient openEhrClient;
+    private static Map<String, Object> openehrDatatypes = new HashMap<>();
 
     private OpenEhrObds() {
     }
@@ -121,23 +123,34 @@ public final class OpenEhrObds {
             if (m.getSource() == null) {
                 return;
             }
-            CxxItemSet is = CxxMdrItemSet.get(Settings.getCxxmdr(), m.getTarget());
-            is.getItems().forEach(it -> {
-                try {
-                    if (!FHIR_ATTRIBUTES.containsKey(m.getTarget())) {
-                        FHIR_ATTRIBUTES.put(m.getTarget(), new HashMap<>());
+            if (Settings.getCxxmdr() != null) {
+                CxxItemSet is = CxxMdrItemSet.get(Settings.getCxxmdr(), m.getTarget());
+                is.getItems().forEach(it -> {
+                    try {
+                        if (!FHIR_ATTRIBUTES.containsKey(m.getTarget())) {
+                            FHIR_ATTRIBUTES.put(m.getTarget(), new HashMap<>());
+                        }
+                        FHIR_ATTRIBUTES.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
+                                CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "fhir", it.getId()));
+    
+                        if (!OPENEHR_ATTRIBUTES.containsKey(m.getTemplateId())) {
+                            OPENEHR_ATTRIBUTES.put(m.getTemplateId(), new HashMap<>());
+                        }
+                        ((Map<String, Object>) OPENEHR_ATTRIBUTES.getOrDefault(m.getTemplateId(), new HashMap<>())).put(
+                                it.getId(),
+                                CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr", it.getId()));
+                    } catch (URISyntaxException e) {
+                        Logger.error(e);
                     }
-                    FHIR_ATTRIBUTES.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
-                            CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "fhir", it.getId()));
+                });
+                openehrDatatypes.put(m.getTemplateId(),
+                        formatMap((Map<String, Object>) OPENEHR_ATTRIBUTES.get(m.getTemplateId())));
+                try {
+                    AQLS.put(m.getTemplateId(),
+                            CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
                 } catch (URISyntaxException e) {
                     Logger.error(e);
                 }
-            });
-            try {
-                AQLS.put(m.getTemplateId(),
-                        CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
-            } catch (URISyntaxException e) {
-                Logger.error(e);
             }
 
         });
@@ -246,11 +259,17 @@ public final class OpenEhrObds {
         if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSource() != null) {
             Mapping m = Settings.getMapping().get(path);
 
-            Map<String, Object> mapped = convertMdr(xmlSet, m);
+            Map<String, Object> mapped = new HashMap<>();
+            // ToDo: Add Switch!
+            if (Settings.getCxxmdr() != null) {
+                mapped.putAll(convertMdr(xmlSet, m));
+            }
             assert mapped != null;
             mapped.values().removeIf(Objects::isNull);
             listConv(mapped);
-            mapped.entrySet().forEach(e -> queryFhirTs(m, e));
+            if (Settings.getCxxmdr() != null) {
+                mapped.entrySet().forEach(e -> queryFhirTs(m, e));
+            }
             mapped.values().removeIf(Objects::isNull);
             Map<String, Object> result = formatMap(mapped);
 
@@ -415,7 +434,7 @@ public final class OpenEhrObds {
 
         try {
             // Write JSON to file
-            composition = PARSERS.get(templateId).build(data);
+            composition = PARSERS.get(templateId).build(data, (Map<String, Object>) openehrDatatypes.getOrDefault(templateId, new HashMap<>()));
 
             Logger.debug("Finished JSON-Generation. Generating String.");
             ehr = JacksonUtil.getObjectMapper().writeValueAsString(composition);
