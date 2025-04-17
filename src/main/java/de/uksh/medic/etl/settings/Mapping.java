@@ -10,6 +10,7 @@ public class Mapping {
     private String target;
     private int targetVersion;
     private boolean split;
+    private boolean global;
     private String templateId;
     private boolean update;
 
@@ -51,6 +52,14 @@ public class Mapping {
 
     public void setSplit(boolean split) {
         this.split = split;
+    }
+
+    public boolean getGlobal() {
+        return global;
+    }
+
+    public void setGlobal(boolean global) {
+        this.global = global;
     }
 
     public String getTemplateId() {

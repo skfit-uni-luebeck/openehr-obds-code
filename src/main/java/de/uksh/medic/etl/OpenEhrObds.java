@@ -252,6 +252,7 @@ public final class OpenEhrObds {
         }
 
         boolean split = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSplit();
+        boolean global = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getGlobal();
         boolean update = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).isUpdate();
 
         Map<String, Object> theMap = resMap;
@@ -273,8 +274,13 @@ public final class OpenEhrObds {
             mapped.values().removeIf(Objects::isNull);
             Map<String, Object> result = formatMap(mapped);
 
-            result.putAll(resMap);
-            theMap = result;
+            if (global) {
+                resMap.putAll(result);
+                theMap = resMap;
+            } else {
+                result.putAll(resMap);
+                theMap = result;
+            }
 
             if (update && result.get("requestMethod") != null
                     && "DELETE".equals(((List<String>) result.get("requestMethod")).getFirst())) {
@@ -285,7 +291,7 @@ public final class OpenEhrObds {
 
             if (split) {
                 Logger.info("Building composition.");
-                buildOpenEhrComposition(m.getTemplateId(), result);
+                buildOpenEhrComposition(m.getTemplateId(), theMap);
             }
         }
 
