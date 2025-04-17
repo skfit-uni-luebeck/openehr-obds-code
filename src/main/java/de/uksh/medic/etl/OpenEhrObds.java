@@ -517,7 +517,7 @@ public final class OpenEhrObds {
     }
 
     private static ObjectVersionId getVersionUid(String templateId, String itemId) throws ProcessingException {
-        if (AQLS.get(templateId).getUpdateAql() == null) {
+        if (!AQLS.containsKey(templateId) || AQLS.get(templateId).getUpdateAql() == null) {
             Logger.warn("Cannot update composition because updateAql query not set.");
             return null;
         }
