@@ -1,5 +1,6 @@
 package de.uksh.medic.etl.jobs.mdr.centraxx;
 
+import com.google.common.base.Strings;
 import de.uksh.medic.etl.jobs.FhirResolver;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.settings.CxxMdrSettings;
@@ -25,7 +26,7 @@ public final class CxxMdrUnitConvert {
      * @param ma MappingAttributes object
      * @return Converted value or null if an error occured
      */
-    public static String convert(CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
+    public static String[] convert(CxxMdrSettings mdr, Map<String, String> map, MappingAttributes ma) {
         if (!map.containsKey("magnitude") || !map.containsKey("unit")
                 || map.get("magnitude") == null || map.get("unit") == null
                 || map.get("magnitude").isBlank() || map.get("unit").isBlank()) {
@@ -47,6 +48,11 @@ public final class CxxMdrUnitConvert {
             return null;
         }
 
+        if (Strings.isNullOrEmpty(ma.getUnit())) {
+            String[] ret = {map.get("magnitude"), convertedUnit};
+            return ret;
+        }
+
         RestTemplate rt = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.CONTENT_TYPE, "text/csv");
@@ -60,7 +66,8 @@ public final class CxxMdrUnitConvert {
             CSVReader reader = new CSVReader(new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8)));
             reader.readHeaders();
             reader.line();
-            return reader.cell("targetValue");
+            String[] ret = {reader.cell("targetValue"), ma.getUnit()};
+            return ret;
         } catch (IOException ignored) { }
         return null;
     }

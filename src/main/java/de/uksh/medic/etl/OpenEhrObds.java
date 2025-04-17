@@ -328,16 +328,16 @@ public final class OpenEhrObds {
         MappingAttributes fa = FHIR_ATTRIBUTES.get(m.getTarget()).get(e.getKey());
         List<Object> listed = new ArrayList<>();
         for (Object o : (List) e.getValue()) {
-            if (fa != null && fa.getUnit() != null && !fa.getUnit().isBlank()
+            if (fa != null && fa.getTarget() != null && "http://unitsofmeasure.org".equals(fa.getTarget().toString())
                     && fa.getConceptMap() != null) {
                 switch (o) {
                     case String c -> listed.add(o);
                     case Map map when map.containsKey("magnitude") && map.containsKey("unit") -> {
-                        String newMagnitude = CxxMdrUnitConvert.convert(Settings.getCxxmdr(), map, fa);
+                        String[] newMagnitude = CxxMdrUnitConvert.convert(Settings.getCxxmdr(), map, fa);
                         if (newMagnitude != null) {
-                            map.replace("unit", fa.getUnit());
-                            map.replace("magnitude", newMagnitude);
-                            listed.add(new String[] {newMagnitude, fa.getUnit()});
+                            map.replace("unit", newMagnitude[1]);
+                            map.replace("magnitude", newMagnitude[0]);
+                            listed.add(new String[] {newMagnitude[0], newMagnitude[1]});
                         } else {
                             Logger.error("Could not convert unit");
                             e.setValue(null);
