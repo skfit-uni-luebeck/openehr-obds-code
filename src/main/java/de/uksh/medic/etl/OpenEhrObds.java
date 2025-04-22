@@ -21,6 +21,7 @@ import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxItemSet;
 import de.uksh.medic.etl.model.mdr.centraxx.RelationConvert;
 import de.uksh.medic.etl.openehrmapper.EHRParser;
+import de.uksh.medic.etl.openehrmapper.Generator;
 import de.uksh.medic.etl.settings.*;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
@@ -53,6 +54,7 @@ import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
+import org.hl7.fhir.r4.model.Coding;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
 import org.tinylog.Logger;
 
@@ -276,10 +278,12 @@ public final class OpenEhrObds {
             Mapping m = Settings.getMapping().get(path);
 
             Map<String, Object> mapped = localMap(xmlSet, m.getTemplateId(), path);
+            if (mapped == null) {
+                return;
+            }
             if (Settings.getCxxmdr() != null) {
                 mapped.putAll(convertMdr(xmlSet, m));
             }
-            assert mapped != null;
             mapped.values().removeIf(Objects::isNull);
             Utils.listConv(mapped);
             if (Settings.getCxxmdr() != null) {
@@ -288,11 +292,13 @@ public final class OpenEhrObds {
             mapped.values().removeIf(Objects::isNull);
             Map<String, Object> result = Utils.formatMap(mapped);
 
-            if (global) {
-                resMap.putAll(result);
+            boolean done = ((List<Boolean>) result.getOrDefault("done", List.of(true))).get(0);
+
+            if (global || !done) {
+                Generator.deepMergeNoReplace(resMap, result);
                 theMap = resMap;
             } else {
-                result.putAll(resMap);
+                Generator.deepMergeNoReplace(result, resMap);
                 theMap = result;
             }
 
@@ -304,7 +310,7 @@ public final class OpenEhrObds {
                 return;
             }
 
-            if (split) {
+            if (split && done) {
                 Logger.info("Building composition.");
                 buildOpenEhrComposition(m.getTemplateId(), theMap);
             }

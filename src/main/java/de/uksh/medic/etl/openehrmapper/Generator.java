@@ -901,20 +901,38 @@ public class Generator {
 
     public Map<String, Object> applyDefaults(Map<String, Object> map) {
         Map<String, Object> defaults = getDefaultValues();
-        deepMerge(defaults, map);
+        deepMergeReplace(defaults, map);
         return defaults;
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    private static void deepMerge(Map<String, Object> map1, Map<String, Object> map2) {
+    public static void deepMergeReplace(Map<String, Object> map1, Map<String, Object> map2) {
         for (String key : map2.keySet()) {
             Object value2 = map2.get(key);
             if (map1.containsKey(key)) {
                 Object value1 = map1.get(key);
                 if (value1 instanceof Map && value2 instanceof Map) {
-                    deepMerge((Map<String, Object>) value1, (Map<String, Object>) value2);
+                    deepMergeReplace((Map<String, Object>) value1, (Map<String, Object>) value2);
                 } else if (value1 instanceof List && value2 instanceof List) {
-                    map1.put(key, merge((List) value1, (List) value2));
+                    map1.put(key, mergeReplace((List) value1, (List) value2));
+                } else {
+                    map1.put(key, value2);
+                }
+            } else {
+                map1.put(key, value2);
+            }
+        }
+    }
+
+    public static void deepMergeNoReplace(Map<String, Object> map1, Map<String, Object> map2) {
+        for (String key : map2.keySet()) {
+            Object value2 = map2.get(key);
+            if (map1.containsKey(key)) {
+                Object value1 = map1.get(key);
+                if (value1 instanceof Map && value2 instanceof Map) {
+                    deepMergeNoReplace((Map<String, Object>) value1, (Map<String, Object>) value2);
+                } else if (value1 instanceof List && value2 instanceof List) {
+                    map1.put(key, mergeNoReplace((List) value1, (List) value2));
                 } else {
                     map1.put(key, value2);
                 }
@@ -925,8 +943,14 @@ public class Generator {
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    private static List merge(List list1, List list2) {
+    private static List mergeReplace(List list1, List list2) {
         list1.clear();
+        list1.addAll(list2);
+        return list1;
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static List mergeNoReplace(List list1, List list2) {
         list1.addAll(list2);
         return list1;
     }
