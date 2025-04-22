@@ -54,7 +54,6 @@ import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
-import org.hl7.fhir.r4.model.Coding;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
 import org.tinylog.Logger;
 
