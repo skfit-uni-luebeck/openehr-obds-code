@@ -105,9 +105,7 @@ public final class OpenEhrObds {
 
         openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
 
-        Settings.getMapping().values().forEach(m -> {
-            initializeAttribute(m);
-        });
+
 
         ObjectMapper mapper;
 
@@ -116,6 +114,10 @@ public final class OpenEhrObds {
         } else {
             mapper = new JsonMapper();
         }
+
+        Settings.getMapping().values().forEach(m -> {
+            initializeAttribute(m, mapper);
+        });
 
         Logger.info("OpenEhrObds started!");
 
@@ -173,7 +175,7 @@ public final class OpenEhrObds {
         }
     }
 
-    private static void initializeAttribute(Mapping m) {
+    private static void initializeAttribute(Mapping m, ObjectMapper mapper) {
         if (m.getTemplateId() != null) {
             OPERATIONALTEMPLATE template;
             if (openEhrClient != null) {
@@ -198,6 +200,7 @@ public final class OpenEhrObds {
         if (m.getSource() == null) {
             return;
         }
+        File aqlFile = new File("scripts/aqls.json");
         if (Settings.getCxxmdr() != null) {
             CxxItemSet is = CxxMdrItemSet.get(Settings.getCxxmdr(), m.getTarget());
             is.getItems().forEach(it -> {
@@ -224,6 +227,13 @@ public final class OpenEhrObds {
                 AQLS.put(m.getTemplateId(),
                         CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
             } catch (URISyntaxException e) {
+                Logger.error(e);
+            }
+        } else if (aqlFile.exists()){
+            try {
+                AQLS.putAll(mapper.readValue(aqlFile, new TypeReference<Map<String, MappingAttributes>>() {
+                }));
+            } catch (IOException e) {
                 Logger.error(e);
             }
         }
