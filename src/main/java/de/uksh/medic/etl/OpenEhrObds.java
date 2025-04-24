@@ -105,18 +105,17 @@ public final class OpenEhrObds {
 
         openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
 
-
-
         ObjectMapper mapper;
+        JsonMapper jm = new JsonMapper();
 
         if ("xml".equals(Settings.getMode())) {
             mapper = new XmlMapper();
         } else {
-            mapper = new JsonMapper();
+            mapper = jm;
         }
 
         Settings.getMapping().values().forEach(m -> {
-            initializeAttribute(m, mapper);
+            initializeAttribute(m, jm);
         });
 
         Logger.info("OpenEhrObds started!");
@@ -335,7 +334,7 @@ public final class OpenEhrObds {
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
                     for (Object b : a) {
-                        if ((b instanceof Map)) {
+                        if (b instanceof Map) {
                             walkTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
                         }
                     }

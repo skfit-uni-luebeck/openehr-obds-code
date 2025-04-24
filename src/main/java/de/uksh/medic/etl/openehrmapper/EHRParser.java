@@ -12,6 +12,7 @@ import com.nedap.archie.rm.datatypes.CodePhrase;
 import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvIdentifier;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
+import com.nedap.archie.rm.generic.PartyIdentified;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
@@ -116,6 +117,12 @@ public class EHRParser {
 
         EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
                 new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
+        if (map.containsKey("health_care_facility")) {
+            Map<String, List<String>> hcf = (Map<String, List<String>>) map.get("health_care_facility");
+            DvIdentifier identifier = new DvIdentifier();
+            identifier.setId(hcf.get("id").get(0));
+            context.setHealthCareFacility(new PartyIdentified(null, hcf.get("name").get(0), List.of(identifier)));
+        }
         composition.setContext(context);
         ItemTree itemTree = new ItemTree();
         context.setOtherContext(itemTree);
