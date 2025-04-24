@@ -108,7 +108,7 @@ public class EHRParser {
 
         composition.setFeederAudit(audit);
 
-        map.put("start_time", map.getOrDefault("start_time", LocalDateTime.now().toString()));
+        map.put("start_time", ((List<String>) map.getOrDefault("start_time", List.of(LocalDateTime.now().toString()))).get(0));
 
         Map<String, Object> applyMap = g.applyDefaults(map);
         ArrayList<ContentItem> content = new ArrayList<>();
