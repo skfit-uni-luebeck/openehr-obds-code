@@ -229,7 +229,7 @@ public final class OpenEhrObds {
             } catch (URISyntaxException e) {
                 Logger.error(e);
             }
-        } else if (aqlFile.exists()){
+        } else if (aqlFile.exists()) {
             try {
                 AQLS.putAll(mapper.readValue(aqlFile, new TypeReference<Map<String, MappingAttributes>>() {
                 }));
@@ -335,7 +335,9 @@ public final class OpenEhrObds {
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
                     for (Object b : a) {
-                        walkTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
+                        if ((b instanceof Map)) {
+                            walkTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
+                        }
                     }
                 }
                 default -> {
