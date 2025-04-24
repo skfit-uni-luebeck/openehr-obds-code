@@ -84,6 +84,10 @@ public final class FhirResolver {
                 }
             }
 
+            if (version == null) {
+                return coding.setVersion(null);
+            }
+
             return coding;
 
         } catch (FhirClientConnectionException e) {
