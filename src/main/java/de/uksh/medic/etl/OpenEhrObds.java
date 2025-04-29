@@ -84,7 +84,9 @@ public final class OpenEhrObds {
         configLoader.loadConfiguration(settingsYaml, Settings.class);
 
         fr = new FhirResolver();
-        fc = FhirContext.forR4().newRestfulGenericClient(Settings.getFhirServerUrl().toString());
+        if (Settings.getFhirServerUrl() != null) {
+            fc = FhirContext.forR4().newRestfulGenericClient(Settings.getFhirServerUrl().toString());
+        }
         CxxMdrSettings mdrSettings = Settings.getCxxmdr();
         if (mdrSettings != null) {
             CxxMdrLogin.login(mdrSettings);
