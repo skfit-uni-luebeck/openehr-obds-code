@@ -312,8 +312,8 @@ public final class OpenEhrObds {
                 theMap = result;
             }
 
-            if (update && result.get("requestMethod") != null
-                    && "DELETE".equals(((List<String>) result.get("requestMethod")).getFirst())) {
+            if (update && result.containsKey("delete")
+                    && Boolean.TRUE.equals(((List<Boolean>) result.get("delete")).getFirst())) {
                 Logger.info("Found DELETE entry, trying to delete composition...");
                 OpenEhrUtils.deleteOpenEhrComposition(openEhrClient, AQLS, m.getTemplateId(),
                         ((List<String>) result.get("identifier")).getFirst());
