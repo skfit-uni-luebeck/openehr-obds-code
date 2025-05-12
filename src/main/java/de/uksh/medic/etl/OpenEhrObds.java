@@ -38,7 +38,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.stream.Collectors;
 import javax.xml.namespace.QName;
 import javax.xml.xpath.XPathExpressionException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -95,14 +94,10 @@ public final class OpenEhrObds {
         URI ehrBaseUrl = Settings.getOpenEhrUrl();
         if (ehrBaseUrl != null && Settings.getOpenEhrUser() != null && Settings.getOpenEhrPassword() != null) {
             String credentials = ehrBaseUrl.toString();
-            try {
-                ehrBaseUrl = new URI(credentials.replace("://",
-                        "://" + URLEncoder.encode(Settings.getOpenEhrUser(), StandardCharsets.UTF_8) + ":"
-                                + URLEncoder.encode(Settings.getOpenEhrPassword(), StandardCharsets.UTF_8)
-                                + "@"));
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
-            }
+            ehrBaseUrl = URI.create(credentials.replace("://",
+                    "://" + URLEncoder.encode(Settings.getOpenEhrUser(), StandardCharsets.UTF_8) + ":"
+                            + URLEncoder.encode(Settings.getOpenEhrPassword(), StandardCharsets.UTF_8)
+                            + "@"));
         }
 
         openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
@@ -124,8 +119,11 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testInput").listFiles();
+            File[] files = new File("testData/meona/order/orders").listFiles();
             for (File f : files) {
+                if (f.isDirectory()) {
+                    continue;
+                }
                 walkTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
                 }).entrySet(), 1, "", new LinkedHashMap<>());
             }
@@ -205,22 +203,18 @@ public final class OpenEhrObds {
         if (Settings.getCxxmdr() != null) {
             CxxItemSet is = CxxMdrItemSet.get(Settings.getCxxmdr(), m.getTarget());
             is.getItems().forEach(it -> {
-                try {
-                    if (!FHIR_ATTRIBUTES.containsKey(m.getTarget())) {
-                        FHIR_ATTRIBUTES.put(m.getTarget(), new HashMap<>());
-                    }
-                    FHIR_ATTRIBUTES.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
-                            CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "fhir", it.getId()));
-
-                    if (!OPENEHR_ATTRIBUTES.containsKey(m.getTemplateId())) {
-                        OPENEHR_ATTRIBUTES.put(m.getTemplateId(), new HashMap<>());
-                    }
-                    ((Map<String, Object>) OPENEHR_ATTRIBUTES.getOrDefault(m.getTemplateId(), new HashMap<>())).put(
-                            it.getId(),
-                            CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr", it.getId()));
-                } catch (URISyntaxException e) {
-                    Logger.error(e);
+                if (!FHIR_ATTRIBUTES.containsKey(m.getTarget())) {
+                    FHIR_ATTRIBUTES.put(m.getTarget(), new HashMap<>());
                 }
+                FHIR_ATTRIBUTES.getOrDefault(m.getTarget(), new HashMap<>()).put(it.getId(),
+                        CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "fhir", it.getId()));
+
+                if (!OPENEHR_ATTRIBUTES.containsKey(m.getTemplateId())) {
+                    OPENEHR_ATTRIBUTES.put(m.getTemplateId(), new HashMap<>());
+                }
+                ((Map<String, Object>) OPENEHR_ATTRIBUTES.getOrDefault(m.getTemplateId(), new HashMap<>())).put(
+                        it.getId(),
+                        CxxMdrAttributes.getAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr", it.getId()));
             });
             openehrDatatypes.put(m.getTemplateId(),
                     Utils.formatMap((Map<String, Object>) OPENEHR_ATTRIBUTES.get(m.getTemplateId())));
@@ -330,6 +324,10 @@ public final class OpenEhrObds {
             String newPath = path + "/" + entry.getKey();
             int newDepth = depth + 1;
 
+            if (entry.getValue() == null) {
+                continue;
+            }
+
             switch (entry.getValue()) {
                 case @SuppressWarnings("rawtypes") Map h -> {
                     walkTree(h.entrySet(), newDepth, newPath, theMap);
@@ -355,7 +353,8 @@ public final class OpenEhrObds {
         conv.setTargetProfileCode(m.getTarget());
         conv.setSourceProfileVersion(m.getSourceVersion());
         conv.setTargetProfileVersion(m.getTargetVersion());
-        conv.setValues(xmlSet.stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue)));
+        conv.setValues((Map<String, Object>) xmlSet.stream()
+                .collect(HashMap<String, Object>::new, (m1, v) -> m1.put(v.getKey(), v.getValue()), HashMap::putAll));
         try {
             return CxxMdrConvert.convert(Settings.getCxxmdr(), conv).getValues();
         } catch (JsonProcessingException e) {
