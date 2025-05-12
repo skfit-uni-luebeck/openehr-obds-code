@@ -35,8 +35,7 @@ public final class CxxMdrAttributes {
      * @return FhirAttributes object
      * @throws URISyntaxException
      */
-    public static MappingAttributes getAttributes(CxxMdrSettings mdr, String mdrProfile, String domain, String key)
-            throws URISyntaxException {
+    public static MappingAttributes getAttributes(CxxMdrSettings mdr, String mdrProfile, String domain, String key) {
 
         if (mdr.isTokenExpired()) {
             CxxMdrLogin.login(mdr);
@@ -66,11 +65,11 @@ public final class CxxMdrAttributes {
                         continue;
                     }
                     switch (av.getAttribute()) {
-                        case SYSTEM -> ch.setSystem(new URI(av.getValue()));
-                        case SOURCE -> ch.setSource(new URI(av.getValue()));
-                        case TARGET -> ch.setTarget(new URI(av.getValue()));
+                        case SYSTEM -> ch.setSystem(URI.create(av.getValue()));
+                        case SOURCE -> ch.setSource(URI.create(av.getValue()));
+                        case TARGET -> ch.setTarget(URI.create(av.getValue()));
                         case ID -> ch.setId(av.getValue());
-                        case CONCEPTMAP -> ch.setConceptMap(new URI(av.getValue()));
+                        case CONCEPTMAP -> ch.setConceptMap(URI.create(av.getValue()));
                         case CODE -> ch.setCode(av.getValue());
                         case VERSION -> ch.setVersion(av.getValue());
                         case UNIT -> ch.setUnit(av.getValue());
