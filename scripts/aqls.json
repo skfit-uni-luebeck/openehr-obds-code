@@ -22,7 +22,7 @@
         "version": null,
         "unit": null,
         "updateAql": "SELECT c/uid/value AS uid_based_id FROM EHR e CONTAINS COMPOSITION c WHERE c/archetype_details/template_id/value = '%s' AND c/feeder_audit/originating_system_audit/system_id = '%s' AND c/context/other_context/items[at0002]/value/value = '%s'",
-        "deleteAql": null,
+        "deleteAql": "SELECT e/ehr_id/value AS ehr_id, c/uid/value AS uid_based_id FROM EHR e CONTAINS COMPOSITION c WHERE c/archetype_details/template_id/value = '%s' AND c/feeder_audit/originating_system_audit/system_id = '%s' AND c/context/other_context/items[at0002]/value/value = '%s'",
         "datatype": null
     },
     "KDS_Todesursache": {
