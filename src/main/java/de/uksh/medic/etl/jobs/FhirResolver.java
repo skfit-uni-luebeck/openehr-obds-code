@@ -60,7 +60,7 @@ public final class FhirResolver {
             Logger.error("Could not connect to FHIR Terminology Server", e);
         }
 
-        return new Coding();
+        return null;
     }
 
     public Coding lookUp(URI system, String version, String code) {

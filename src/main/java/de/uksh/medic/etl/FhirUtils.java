@@ -1,5 +1,9 @@
 package de.uksh.medic.etl;
 
+import com.nedap.archie.rm.datatypes.CodePhrase;
+import com.nedap.archie.rm.datavalues.DvCodedText;
+import com.nedap.archie.rm.datavalues.TermMapping;
+import com.nedap.archie.rm.support.identification.TerminologyId;
 import de.uksh.medic.etl.jobs.FhirResolver;
 import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrUnitConvert;
 import de.uksh.medic.etl.model.MappingAttributes;
@@ -9,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import org.hl7.fhir.r4.model.Coding;
 import org.tinylog.Logger;
 
 public final class FhirUtils {
@@ -58,8 +63,17 @@ public final class FhirUtils {
                     };
                     listed.add(fr.lookUp(fa.getSystem(), version, code));
                 } else if (fa.getConceptMap() != null) {
-                    listed.add(fr.conceptMap(fa.getConceptMap(), fa.getSystem(), fa.getSource(),
-                            fa.getTarget(), code));
+                    Coding c = fr.conceptMap(fa.getConceptMap(), fa.getSystem(), fa.getSource(), fa.getTarget(), code);
+                    DvCodedText ct = new DvCodedText();
+                    ct.setDefiningCode(new CodePhrase(
+                            new TerminologyId(c.getSystem(), c.getVersion()),
+                            c.getCode(), c.getDisplay()));
+                    ct.setValue(c.getDisplay());
+                    TermMapping tm = new TermMapping();
+                    tm.setTarget(new CodePhrase(new TerminologyId(fa.getSystem().toString()), code));
+                    tm.setMatch('?');
+                    ct.addMapping(tm);
+                    listed.add(ct);
                 }
             } else {
                 listed.add(o);

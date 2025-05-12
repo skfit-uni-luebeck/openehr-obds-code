@@ -97,7 +97,8 @@ public class Generator {
                 Logger.debug("Filtered out gen_STRING!");
                 return;
             }
-            type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "");
+            type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "").replace("_INTERVAL_DV_QUANTITY_",
+                    "_QUANTITY");
             Method met;
             try {
                 met = this.getClass().getMethod(type, String.class, String.class, Object.class,
@@ -606,6 +607,7 @@ public class Generator {
 
                 ((Element) jsonmap).setValue(ct);
             }
+            case DvCodedText dvct -> ((Element) jsonmap).setValue(dvct);
             default -> {
             }
         }
@@ -670,6 +672,9 @@ public class Generator {
                 ((Element) jsonmap).setValue(dvq);
             }
             case Quantity q -> {
+                if (q.getUnit() == null) {
+                    q.setUnit("1");
+                }
                 DvQuantity dvq = new DvQuantity(q.getUnit(), q.getValue().doubleValue(),
                         Long.valueOf(q.getValue().precision()));
                 ((Element) jsonmap).setValue(dvq);
@@ -708,7 +713,10 @@ public class Generator {
         ((Element) jsonmap).setValue(new DvDateTime(map.get(name)));
     }
 
-    // DV_DURATION
+    public void gen_DV_DURATION(String path, String name, Object jsonmap,
+            Map<String, String> map, Map<String, Object> datatypes) {
+        ((Element) jsonmap).setValue(new DvDuration(map.get(name)));
+    }
 
     // Time Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_5
