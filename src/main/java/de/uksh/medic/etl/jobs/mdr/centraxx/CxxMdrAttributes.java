@@ -5,7 +5,6 @@ import de.uksh.medic.etl.model.mdr.centraxx.CxxAttributeValue;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxList;
 import de.uksh.medic.etl.settings.CxxMdrSettings;
 import java.net.URI;
-import java.net.URISyntaxException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -33,7 +32,6 @@ public final class CxxMdrAttributes {
      * @param mdrProfile profile / form / ItemSet where the item is defined
      * @param key        key of the requested attribute
      * @return FhirAttributes object
-     * @throws URISyntaxException
      */
     public static MappingAttributes getAttributes(CxxMdrSettings mdr, String mdrProfile, String domain, String key) {
 
@@ -95,10 +93,8 @@ public final class CxxMdrAttributes {
      * @param mdrProfile profile / form / ItemSet where the item is defined
      * @param key        key of the requested attribute
      * @return FhirAttributes object
-     * @throws URISyntaxException
      */
-    public static MappingAttributes getProfileAttributes(CxxMdrSettings mdr, String mdrProfile, String domain)
-            throws URISyntaxException {
+    public static MappingAttributes getProfileAttributes(CxxMdrSettings mdr, String mdrProfile, String domain) {
 
         if (mdr.isTokenExpired()) {
             CxxMdrLogin.login(mdr);
