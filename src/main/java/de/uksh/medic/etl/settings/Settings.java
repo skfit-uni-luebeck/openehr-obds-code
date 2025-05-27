@@ -24,6 +24,7 @@ public final class Settings {
     private static int depthLimit;
     private static String systemId;
     private static boolean dev;
+    private static String namespace;
 
     private Settings() {}
 
@@ -133,6 +134,15 @@ public final class Settings {
     @JsonProperty("dev")
     public void setDev(boolean newDev) {
         dev = newDev;
+    }
+
+    public static String getNamespace() {
+        return namespace;
+    }
+
+    @JsonProperty("namespace")
+    public void setNamespace(String newNamespace) {
+        namespace = newNamespace;
     }
 
 }

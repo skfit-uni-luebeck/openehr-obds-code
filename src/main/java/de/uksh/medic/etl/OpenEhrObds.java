@@ -32,7 +32,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -48,7 +47,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.xmlbeans.XmlException;
 import org.apache.xmlbeans.XmlOptions;
-import org.codehaus.groovy.control.CompilationFailedException;
 import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
@@ -72,7 +70,6 @@ public final class OpenEhrObds {
     private OpenEhrObds() {
     }
 
-    @SuppressWarnings("unchecked")
     public static void main(String[] args) throws IOException {
         InputStream settingsYaml = ClassLoader.getSystemClassLoader().getResourceAsStream("settings.yml");
         if (args.length == 1) {
@@ -119,7 +116,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testData/meona/order/orders").listFiles();
+            File[] files = new File("testData/sofa").listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
                     continue;
@@ -218,12 +215,8 @@ public final class OpenEhrObds {
             });
             openehrDatatypes.put(m.getTemplateId(),
                     Utils.formatMap((Map<String, Object>) OPENEHR_ATTRIBUTES.get(m.getTemplateId())));
-            try {
-                AQLS.put(m.getTemplateId(),
-                        CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
-            } catch (URISyntaxException e) {
-                Logger.error(e);
-            }
+            AQLS.put(m.getTemplateId(),
+                    CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
         } else if (aqlFile.exists()) {
             try {
                 AQLS.putAll(mapper.readValue(aqlFile, new TypeReference<Map<String, MappingAttributes>>() {
@@ -252,7 +245,7 @@ public final class OpenEhrObds {
                 if (groovyFile.exists()) {
                     return (Map<String, Object>) s.evaluate(groovyFile);
                 }
-            } catch (CompilationFailedException | IOException e) {
+            } catch (Exception e) {
                 throw new ProcessingException(e);
             }
         }
@@ -408,12 +401,14 @@ public final class OpenEhrObds {
         UUID ehrId;
         if (ehrIds.getRows() == null) {
             EhrStatus es = new EhrStatus();
+            String namespace = data.containsKey("namespace") ? ((List<String>) data.get("namespace")).getFirst()
+                    : Settings.getNamespace();
             es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
             es.setName(new DvText("EHR status"));
             es.setQueryable(true);
             es.setModifiable(true);
             es.setSubject(new PartySelf(new PartyRef(
-                    new HierObjectId(ehrIdString), "DEMOGRAPHIC", "PERSON")));
+                    new HierObjectId(ehrIdString), namespace, "PERSON")));
             ehrId = openEhrClient.ehrEndpoint().createEhr(es);
         } else if (ehrIds.getRows().size() == 1) {
             ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
