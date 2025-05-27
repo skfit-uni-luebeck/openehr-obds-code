@@ -227,7 +227,7 @@ public final class OpenEhrObds {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "IllegalCatch"})
     public static Map<String, Object> localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path) {
         Binding b = new Binding();
         GroovyShell s = new GroovyShell(b);

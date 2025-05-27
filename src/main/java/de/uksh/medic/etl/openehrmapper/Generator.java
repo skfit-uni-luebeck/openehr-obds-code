@@ -601,7 +601,7 @@ public class Generator {
             case String s -> {
                 String terminology = getLocalTerminologyId(path);
                 String display = getLocalTerminologyTerm((String) map.get("name"), name, s);
-                if (("").equals(display)) {
+                if ("".equals(display)) {
                     String local = getLocalTerm(path, s);
                     ct.setDefiningCode(new CodePhrase(
                             new TerminologyId(terminology),
