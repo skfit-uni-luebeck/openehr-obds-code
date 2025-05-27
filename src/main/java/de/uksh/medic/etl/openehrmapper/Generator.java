@@ -118,9 +118,9 @@ public class Generator {
             Map<String, Object> datatypes)
             throws Exception {
         String paramName = getArcheTypeId(path);
-        String label = getTypeLabel(path, getNodeId(path));
+        String label = getLabel(path, getNodeId(path), paramName);
         String resolvedPath = paramName + ", '" + label + "'";
-        String newPath = path + "/attributes";
+        String newPath = path + "/attributes[rm_attribute_name=\"items\"]";
         Section section = new Section();
         section.setArchetypeNodeId(paramName);
 
@@ -128,7 +128,7 @@ public class Generator {
         List<ContentItem> items = new ArrayList<>();
         processAttributeChildren(newPath, paramName, items,
                 (Map<String, Object>) map.getOrDefault(resolvedPath, map.get(paramName)),
-                (Map<String, Object>) datatypes.getOrDefault(resolvedPath, map.get(paramName)));
+                (Map<String, Object>) datatypes.getOrDefault(resolvedPath, datatypes.get(paramName)));
         section.setItems(items);
 
         ((List<ContentItem>) jsonmap).add(section);
@@ -282,7 +282,7 @@ public class Generator {
             instruction.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
             instruction.setEncoding(new CodePhrase(new TerminologyId("IANA_character-sets"), "UTF-8"));
             instruction.setSubject(new PartySelf());
-            instruction.setNarrative(new DvText(""));
+            instruction.setNarrative(new DvText(((List<String>) le.get("narrative")).get(0)));
 
             List<Activity> activities = new ArrayList<>();
             ItemTree protocol = new ItemTree();
@@ -449,8 +449,10 @@ public class Generator {
             cluster.setArchetypeNodeId(aNodeId);
             cluster.setNameAsString(label);
             ArrayList<Item> items = new ArrayList<>();
-            processAttributeChildren(newPath, paramName, items, le,
-                    (Map<String, Object>) datatypes.getOrDefault(usedCode, new HashMap<>()));
+            Map<String, Object> mam = datatypes.containsKey(usedCode)
+                    && datatypes.get(usedCode) instanceof MappingAttributes ? datatypes
+                            : (Map<String, Object>) datatypes.getOrDefault(usedCode, new HashMap<>());
+            processAttributeChildren(newPath, paramName, items, le, mam);
             cluster.setItems(items);
             ((ArrayList<Object>) jsonmap).add(cluster);
 
@@ -503,6 +505,9 @@ public class Generator {
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
+        if ("".equals(label)) {
+            label = getLabel(path, nodeId, name);
+        }
         String newPath = path + "/attributes";
         History<ItemStructure> history = (History<ItemStructure>) jsonmap;
         history.setArchetypeNodeId(nodeId);
@@ -517,7 +522,7 @@ public class Generator {
                     new DvDuration((TemporalAmount) Period.between(zdt1.toLocalDate(), zdt2.toLocalDate())));
         }
 
-        processAttributeChildren(newPath, nodeId, history, map, datatypes);
+        processAttributeChildren(newPath, name, history, map, datatypes);
     }
 
     @SuppressWarnings("unchecked")
@@ -526,6 +531,9 @@ public class Generator {
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
+        if ("".equals(label)) {
+            label = getLabel(path, nodeId, name);
+        }
         String newPath = path + "/attributes";
         Event<ItemStructure> events = new PointEvent<>();
         events.setArchetypeNodeId(nodeId);
@@ -534,7 +542,7 @@ public class Generator {
 
         events.setTime(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
         ItemTree itemTree = new ItemTree();
-        processAttributeChildren(newPath, nodeId, itemTree, map, datatypes);
+        processAttributeChildren(newPath, name, itemTree, map, datatypes);
         events.setData(itemTree);
 
         ((History<ItemStructure>) jsonmap).addEvent(events);
@@ -591,23 +599,26 @@ public class Generator {
                 ((Element) jsonmap).setValue(ct);
             }
             case String s -> {
+                String terminology = getLocalTerminologyId(path);
                 String display = getLocalTerminologyTerm((String) map.get("name"), name, s);
-                if ("::".equals(display)) {
+                if (("").equals(display)) {
                     String local = getLocalTerm(path, s);
                     ct.setDefiningCode(new CodePhrase(
-                            new TerminologyId("local"),
+                            new TerminologyId(terminology),
                             local, s));
                     ct.setValue(s);
                 } else {
                     ct.setDefiningCode(new CodePhrase(
-                            new TerminologyId(display.split("::")[0]),
-                            s, display.split("::")[1]));
-                    ct.setValue(display.split("::")[1]);
+                            new TerminologyId(terminology),
+                            s, display));
+                    ct.setValue(display);
                 }
 
                 ((Element) jsonmap).setValue(ct);
             }
             case DvCodedText dvct -> ((Element) jsonmap).setValue(dvct);
+            case null -> {
+            }
             default -> {
             }
         }
@@ -828,14 +839,19 @@ public class Generator {
     private String getLocalTerminologyTerm(String archetype, String nodeId, String code) throws Exception {
         String newPath = "//archetype_id[value/text()=\"" + archetype + "\"]/../term_definitions[contains(@code, \"::"
                 + code + "\")]/items/text()";
-        String terminologyId = "//node_id[text()=\"" + nodeId + "\"]/../descendant::children[./code_list=\""
-                + code + "\"]/terminology_id/value/text()";
         if (!cache.containsKey(newPath)) {
             XPathExpression expr = XP.compile(newPath);
-            XPathExpression expr2 = XP.compile(terminologyId);
-            cache.put(newPath, expr2.evaluate(opt, XPathConstants.STRING) + "::"
-                    + ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
-                            .replaceAll("\\n", " "));
+            cache.put(newPath, ((String) expr.evaluate(opt, XPathConstants.STRING)).replaceAll("^* (?m) ", "")
+                    .replaceAll("\\n", " "));
+        }
+        return cache.get(newPath);
+    }
+
+    private String getLocalTerminologyId(String path) throws Exception {
+        String newPath = path + "/attributes/children[rm_type_name=\"CODE_PHRASE\"]/terminology_id/value/text()";
+        if (!cache.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         return cache.get(newPath);
     }
@@ -851,10 +867,10 @@ public class Generator {
 
         String codePath = "//term_definitions[items/@id=\"text\"][items/text()=\"" + code + "\"]/@code";
         XPathExpression expr2 = XP.compile(codePath);
-        NodeList nl2 = (NodeList) expr2.evaluate(opt, XPathConstants.NODESET);
-        for (int i = 0; i < nl2.getLength(); i++) {
-            if (codes.contains(nl2.item(i).getTextContent())) {
-                return nl2.item(i).getTextContent();
+        String nodeCode = (String) expr2.evaluate(opt, XPathConstants.STRING);
+        for (String s : codes) {
+            if (s.contains(nodeCode)) {
+                return s;
             }
         }
 
@@ -891,15 +907,15 @@ public class Generator {
                 XPathExpression exprP = XP.compile(path + "[" + i + "]/differential_path/text()");
                 String value = (String) exprC.evaluate(opt, XPathConstants.STRING);
                 String differentialPath = ((String) exprP.evaluate(opt, XPathConstants.STRING)).trim();
-                List<String> l = List.of(differentialPath.split("/"));
+                List<String> l = List.of(differentialPath.split("]/"));
                 String last = l.getLast().split("(\\[|\\])")[1].replaceAll(",.*", "");
                 for (int j = 1; j < l.size() - 1; j++) {
-                    String s = l.get(j);
+                    String s = l.get(j) + "]";
                     if (s.contains("description[at") || s.contains("data[at")) {
                         continue;
                     }
                     Map<String, Object> n = new HashMap<>();
-                    String s2 = s.split("(\\[|\\])")[1].replaceAll(",.*", "");
+                    String s2 = s.split("(\\[|\\])")[1].replaceAll(",.*", "").split(" ")[0];
                     current.put(s2, n);
                     current = n;
                 }
