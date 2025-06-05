@@ -108,9 +108,7 @@ public final class OpenEhrObds {
             mapper = jm;
         }
 
-        Settings.getMapping().values().forEach(m -> {
-            initializeAttribute(m, jm);
-        });
+        Settings.getMapping().values().forEach(m -> m.forEach(n -> initializeAttribute(n, jm)));
 
         Logger.info("OpenEhrObds started!");
 
@@ -173,13 +171,13 @@ public final class OpenEhrObds {
 
     private static void initializeAttribute(Mapping m, ObjectMapper mapper) {
         if (m.getTemplateId() != null) {
-            OPERATIONALTEMPLATE template;
+            OPERATIONALTEMPLATE template = null;
             if (openEhrClient != null) {
                 Optional<OPERATIONALTEMPLATE> oTemplate = openEhrClient.templateEndpoint()
                         .findTemplate(m.getTemplateId());
-                assert oTemplate.isPresent();
-                template = oTemplate.get();
-            } else {
+                template = oTemplate.orElse(null);
+            }
+            if (template == null) {
                 try {
                     template = OPERATIONALTEMPLATE.Factory
                             .parse(new File(new File("templates"), m.getTemplateId() + ".opt"));
@@ -227,7 +225,7 @@ public final class OpenEhrObds {
         }
     }
 
-    @SuppressWarnings({"unchecked", "IllegalCatch"})
+    @SuppressWarnings({ "unchecked", "IllegalCatch" })
     public static Map<String, Object> localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path) {
         Binding b = new Binding();
         GroovyShell s = new GroovyShell(b);
@@ -265,52 +263,61 @@ public final class OpenEhrObds {
             return;
         }
 
-        boolean split = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSplit();
-        boolean global = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getGlobal();
-        boolean update = Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).isUpdate();
-
         Map<String, Object> theMap = resMap;
 
-        if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path).getSource() != null) {
-            Mapping m = Settings.getMapping().get(path);
+        if (Settings.getMapping().containsKey(path) && Settings.getMapping().get(path) != null
+                && !Settings.getMapping().get(path).isEmpty()) {
 
-            Map<String, Object> mapped = localMap(xmlSet, m.getTemplateId(), path);
-            if (mapped == null) {
-                return;
-            }
-            if (Settings.getCxxmdr() != null) {
-                mapped.putAll(convertMdr(xmlSet, m));
-            }
-            mapped.values().removeIf(Objects::isNull);
-            Utils.listConv(mapped);
-            if (Settings.getCxxmdr() != null) {
-                mapped.entrySet().forEach(e -> FhirUtils.queryFhirTs(FHIR_ATTRIBUTES, m, e, fr));
-            }
-            mapped.values().removeIf(Objects::isNull);
-            Map<String, Object> result = Utils.formatMap(mapped);
+            for (Mapping m : Settings.getMapping().get(path)) {
 
-            boolean done = ((List<Boolean>) result.getOrDefault("done", List.of(true))).get(0);
+                if (m.getSource() == null) {
+                    continue;
+                }
 
-            if (global || !done) {
-                Generator.deepMergeNoReplace(resMap, result);
-                theMap = resMap;
-            } else {
-                Generator.deepMergeNoReplace(result, resMap);
-                theMap = result;
+                boolean split = m.getSplit();
+                boolean global = m.getGlobal();
+                boolean update = m.isUpdate();
+
+                Map<String, Object> mapped = localMap(xmlSet, m.getTemplateId(), path);
+                if (mapped == null) {
+                    return;
+                }
+                if (Settings.getCxxmdr() != null) {
+                    mapped.putAll(convertMdr(xmlSet, m));
+                }
+                mapped.values().removeIf(Objects::isNull);
+                Utils.listConv(mapped);
+                if (Settings.getCxxmdr() != null) {
+                    mapped.entrySet().forEach(e -> FhirUtils.queryFhirTs(FHIR_ATTRIBUTES, m, e, fr));
+                }
+                mapped.values().removeIf(Objects::isNull);
+                Map<String, Object> result = Utils.formatMap(mapped);
+
+                boolean done = ((List<Boolean>) result.getOrDefault("done", List.of(true))).get(0);
+
+                if (global || !done) {
+                    Generator.deepMergeNoReplace(resMap, result);
+                    theMap = resMap;
+                } else {
+                    Generator.deepMergeNoReplace(result, resMap);
+                    theMap = result;
+                }
+
+                if (update && result.containsKey("delete")
+                        && Boolean.TRUE.equals(((List<Boolean>) result.get("delete")).getFirst())) {
+                    Logger.info("Found DELETE entry, trying to delete composition...");
+                    OpenEhrUtils.deleteOpenEhrComposition(openEhrClient, AQLS, m.getTemplateId(),
+                            ((List<String>) result.get("identifier")).getFirst());
+                    return;
+                }
+
+                if (split && done) {
+                    Logger.info("Building composition.");
+                    buildOpenEhrComposition(m.getTemplateId(), theMap);
+                }
+
             }
 
-            if (update && result.containsKey("delete")
-                    && Boolean.TRUE.equals(((List<Boolean>) result.get("delete")).getFirst())) {
-                Logger.info("Found DELETE entry, trying to delete composition...");
-                OpenEhrUtils.deleteOpenEhrComposition(openEhrClient, AQLS, m.getTemplateId(),
-                        ((List<String>) result.get("identifier")).getFirst());
-                return;
-            }
-
-            if (split && done) {
-                Logger.info("Building composition.");
-                buildOpenEhrComposition(m.getTemplateId(), theMap);
-            }
         }
 
         for (Entry<String, Object> entry : xmlSet) {

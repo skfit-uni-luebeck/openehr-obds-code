@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.net.URI;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,7 +21,7 @@ public final class Settings {
     private static String mode;
     private static CxxMdrSettings cxxmdr;
     private static KafkaSettings kafka;
-    private static Map<String, Mapping> mapping;
+    private static Map<String, List<Mapping>> mapping;
     private static int depthLimit;
     private static String systemId;
     private static boolean dev;
@@ -109,12 +110,12 @@ public final class Settings {
         kafka = newKafka;
     }
 
-    public static Map<String, Mapping> getMapping() {
+    public static Map<String, List<Mapping>> getMapping() {
         return mapping;
     }
 
     @JsonProperty("mapping")
-    public void setMapping(Map<String, Mapping> newMapping) {
+    public void setMapping(Map<String, List<Mapping>> newMapping) {
         mapping = newMapping;
     }
 
