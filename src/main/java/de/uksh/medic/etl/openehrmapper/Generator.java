@@ -25,6 +25,7 @@ import com.nedap.archie.rm.datavalues.DvIdentifier;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.DvURI;
 import com.nedap.archie.rm.datavalues.quantity.DvCount;
+import com.nedap.archie.rm.datavalues.quantity.DvInterval;
 import com.nedap.archie.rm.datavalues.quantity.DvOrdinal;
 import com.nedap.archie.rm.datavalues.quantity.DvQuantity;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDate;
@@ -643,7 +644,17 @@ public class Generator {
     // Quantity Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_3
 
-    // DV_INTERVAL
+    public void gen_DV_INTERVAL(String path, String name, Object jsonmap,
+            Map<String, String> map, Map<String, Object> datatypes) throws Exception {
+        String[] intervals = map.get(name).split(" - ");
+        if (intervals.length != 2) {
+            return;
+        }
+        DvInterval<DvTime> dvi = new DvInterval<>();
+        dvi.setLower(new DvTime(intervals[0]));
+        dvi.setUpper(new DvTime(intervals[1]));
+        ((Element) jsonmap).setValue(dvi);
+    }
 
     // REFERENCE_RANGE
 
