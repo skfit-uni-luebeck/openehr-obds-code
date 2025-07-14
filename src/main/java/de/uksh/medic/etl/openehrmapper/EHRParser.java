@@ -36,101 +36,104 @@ import org.xml.sax.SAXException;
 
 public class EHRParser {
 
-    private Document doc;
-    private Generator g;
+	private Document doc;
+	private Generator g;
 
-    public EHRParser(String xml) {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(false); // never forget this!
-        try {
-            doc = factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
-            g = new Generator(doc);
-        } catch (ParserConfigurationException | SAXException | IOException e) {
-            Logger.error(e);
-        }
-    }
+	public EHRParser(String xml) {
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		factory.setNamespaceAware(false); // never forget this!
+		try {
+			doc = factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
+			g = new Generator(doc);
+		} catch (ParserConfigurationException | SAXException | IOException e) {
+			Logger.error(e);
+		}
+	}
 
-    public Composition build(Map<String, Object> map, Map<String, Object> datatypes)
-            throws XPathExpressionException {
+	public Composition build(Map<String, Object> map, Map<String, Object> datatypes)
+			throws XPathExpressionException {
 
-        String pathContent = "//template/definition[rm_type_name = \"COMPOSITION\"]"
-                + "/attributes[rm_attribute_name=\"content\"]";
-        String pathContext = "//template/definition[rm_type_name = \"COMPOSITION\"]"
-                + "/attributes[rm_attribute_name=\"context\"]/children/attributes[rm_attribute_name=\"other_context\"]";
+		String pathContent = "//template/definition[rm_type_name = \"COMPOSITION\"]"
+				+ "/attributes[rm_attribute_name=\"content\"]";
+		String pathContext = "//template/definition[rm_type_name = \"COMPOSITION\"]"
+				+ "/attributes[rm_attribute_name=\"context\"]/children/attributes[rm_attribute_name=\"other_context\"]";
 
-        XPathFactory xpf = XPathFactory.newInstance();
-        XPath xp = xpf.newXPath();
+		XPathFactory xpf = XPathFactory.newInstance();
+		XPath xp = xpf.newXPath();
 
-        Composition composition = new Composition();
+		Composition composition = new Composition();
 
-        composition.setArchetypeNodeId(
-                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING)).trim());
+		composition.setArchetypeNodeId(
+				((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING)).trim());
 
-        String name = ((String) xp.evaluate(
-                "//template/definition/attributes[rm_attribute_name = \"name\"]/children/attributes"
-                        + "[rm_attribute_name = \"value\"]/children/item/list/text()",
-                doc, XPathConstants.STRING)).trim();
-        if ("".equals(name)) {
-            name = ((String) xp.evaluate(
-                    "//template/definition/template_id/value/text()",
-                    doc, XPathConstants.STRING)).trim();
-        }
-        composition.setNameAsString(name);
+		String name = ((String) xp.evaluate(
+				"//template/definition/attributes[rm_attribute_name = \"name\"]/children/attributes"
+						+ "[rm_attribute_name = \"value\"]/children/item/list/text()",
+				doc, XPathConstants.STRING)).trim();
+		if ("".equals(name)) {
+			name = ((String) xp.evaluate(
+					"//template/definition/template_id/value/text()",
+					doc, XPathConstants.STRING)).trim();
+		}
+		composition.setNameAsString(name);
 
-        Archetyped archetypeDetails = new Archetyped();
-        archetypeDetails.setArchetypeId(new ArchetypeID(
-                ((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING)).trim()));
+		Archetyped archetypeDetails = new Archetyped();
+		archetypeDetails.setArchetypeId(new ArchetypeID(
+				((String) xp.evaluate("//template/definition/archetype_id", doc, XPathConstants.STRING)).trim()));
 
-        TemplateId templateId = new TemplateId();
-        templateId.setValue(((String) xp.evaluate("//template/template_id", doc, XPathConstants.STRING)).trim());
-        archetypeDetails.setTemplateId(templateId);
-        archetypeDetails.setRmVersion("1.1.0");
-        composition.setArchetypeDetails(archetypeDetails);
-        composition.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
-        composition.setTerritory(new CodePhrase(new TerminologyId("ISO_3166-1"), "DE"));
-        composition.setCategory(new DvCodedText("event", new CodePhrase(new TerminologyId("openehr"), "433")));
-        composition.setComposer(new PartySelf());
+		TemplateId templateId = new TemplateId();
+		templateId.setValue(((String) xp.evaluate("//template/template_id", doc, XPathConstants.STRING)).trim());
+		archetypeDetails.setTemplateId(templateId);
+		archetypeDetails.setRmVersion("1.1.0");
+		composition.setArchetypeDetails(archetypeDetails);
+		composition.setLanguage(new CodePhrase(new TerminologyId("ISO_639-1"), "de"));
+		composition.setTerritory(new CodePhrase(new TerminologyId("ISO_3166-1"), "DE"));
+		composition.setCategory(new DvCodedText("event", new CodePhrase(new TerminologyId("openehr"), "433")));
+		composition.setComposer(new PartySelf());
 
-        Logger.debug("Setting Feeder_Audit System-ID to {}", Settings.getSystemId());
-        FeederAuditDetails details = new FeederAuditDetails(Settings.getSystemId());
+		Logger.debug("Setting Feeder_Audit System-ID to {}", Settings.getSystemId());
+		FeederAuditDetails details = new FeederAuditDetails(Settings.getSystemId());
 
-        List<String> list = (List<String>) map.get("identifier");
-        FeederAudit audit;
+		List<String> list = (List<String>) map.get("identifier");
+		FeederAudit audit;
 
-        if (list != null && !list.isEmpty()) {
-            Logger.debug("Setting originating_system_item_id to {}", list.getFirst());
-            DvIdentifier identifier = new DvIdentifier();
-            identifier.setId(list.getFirst());
-            audit = new FeederAudit(details, List.of(identifier), null, null, null);
-        } else {
-            audit = new FeederAudit(details, null, null, null, null);
-        }
+		if (list != null && !list.isEmpty()) {
+			Logger.debug("Setting originating_system_item_id to {}", list.getFirst());
+			DvIdentifier identifier = new DvIdentifier();
+			identifier.setId(list.getFirst());
+			audit = new FeederAudit(details, List.of(identifier), null, null, null);
+		} else {
+			audit = new FeederAudit(details, null, null, null, null);
+		}
 
-        composition.setFeederAudit(audit);
+		composition.setFeederAudit(audit);
 
-        map.put("start_time",
-                ((List<String>) map.getOrDefault("start_time", List.of(LocalDateTime.now().toString()))).get(0));
+		map.put("start_time",
+				((List<String>) map.getOrDefault("start_time", List.of(LocalDateTime.now().toString()))).get(0));
 
-        Map<String, Object> applyMap = g.applyDefaults(map);
-        ArrayList<ContentItem> content = new ArrayList<>();
-        composition.setContent(content);
-        g.processAttributeChildren(pathContent, composition.getArchetypeNodeId(), content, applyMap, datatypes);
+		Map<String, Object> applyMap = g.applyDefaults(map);
+		ArrayList<ContentItem> content = new ArrayList<>();
+		composition.setContent(content);
+		g.processAttributeChildren(pathContent, composition.getArchetypeNodeId(), content, applyMap, datatypes);
 
-        EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
-                new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
-        if (map.containsKey("health_care_facility")) {
-            Map<String, List<String>> hcf = (Map<String, List<String>>) map.get("health_care_facility");
-            DvIdentifier identifier = new DvIdentifier();
-            identifier.setId(hcf.get("id").get(0));
-            context.setHealthCareFacility(new PartyIdentified(null, hcf.get("name").get(0), List.of(identifier)));
-        }
-        composition.setContext(context);
-        ItemTree itemTree = new ItemTree();
-        context.setOtherContext(itemTree);
-        g.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap, datatypes);
+		EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
+				new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
+		if (map.containsKey("end_time")) {
+			context.setEndTime(new DvDateTime((String) map.get("end_time")));
+		}
+		if (map.containsKey("health_care_facility")) {
+			Map<String, List<String>> hcf = (Map<String, List<String>>) map.get("health_care_facility");
+			DvIdentifier identifier = new DvIdentifier();
+			identifier.setId(hcf.get("id").get(0));
+			context.setHealthCareFacility(new PartyIdentified(null, hcf.get("name").get(0), List.of(identifier)));
+		}
+		composition.setContext(context);
+		ItemTree itemTree = new ItemTree();
+		context.setOtherContext(itemTree);
+		g.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap, datatypes);
 
-        return composition;
+		return composition;
 
-    }
+	}
 
 }
