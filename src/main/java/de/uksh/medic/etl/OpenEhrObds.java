@@ -233,10 +233,11 @@ public final class OpenEhrObds {
         b.setVariable("path", path);
         b.setVariable("fhirClient", fc);
         b.setVariable("fhirResolver", fr);
+        b.setVariable("openEhrClient", openEhrClient);
         b.setVariable("utils", um);
 
         if (Settings.getDev()) {
-            return javaMap(xmlSet, path, fc, fr, um);
+            return javaMap(xmlSet, path, fc, fr, openEhrClient, um);
         } else {
             try {
                 File groovyFile = new File("scripts", templateId + ".groovy");
@@ -251,8 +252,9 @@ public final class OpenEhrObds {
         return new HashMap<>();
     }
 
+    @SuppressWarnings({ "HiddenField" })
     public static Map<String, Object> javaMap(Set<Entry<String, Object>> xmlSet, String path, IGenericClient fhirClient,
-            FhirResolver fhirResolver, UtilMethods utils) {
+            FhirResolver fhirResolver, DefaultRestClient openEhrClient, UtilMethods utils) {
         return null;
     }
 
