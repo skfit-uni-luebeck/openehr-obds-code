@@ -3,6 +3,7 @@ package de.uksh.medic.etl.jobs;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.exceptions.FhirClientConnectionException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import de.uksh.medic.etl.settings.Settings;
 import java.net.URI;
 import org.hl7.fhir.r4.model.*;
@@ -93,6 +94,8 @@ public final class FhirResolver {
 
         } catch (FhirClientConnectionException e) {
             Logger.error("Could not connect to FHIR Terminology Server", e);
+        } catch (ResourceNotFoundException e) {
+            Logger.error("Could not look up because system was not found.");
         }
 
         return null;
