@@ -51,6 +51,7 @@ import org.ehrbase.openehr.sdk.client.openehrclient.OpenEhrClientConfig;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
 import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.ehrbase.openehr.sdk.response.dto.QueryResponseData;
+import org.ehrbase.openehr.sdk.util.exception.WrongStatusCodeException;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
 import org.tinylog.Logger;
 
@@ -114,7 +115,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testData/sofa").listFiles();
+            File[] files = new File("testData/prozedur/fail").listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
                     continue;
@@ -431,7 +432,19 @@ public final class OpenEhrObds {
         if (ovi != null) {
             composition.setUid(ovi);
         }
-        openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
+        try {
+            openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
+        } catch (WrongStatusCodeException e) {
+            String comp = "";
+            try {
+                JacksonUtil.getObjectMapper().writeValueAsString(composition);
+            } catch (JsonProcessingException e2) {
+
+            }
+            Logger.error("Error on composition upload", comp, e);
+            throw new ProcessingException(e + ";;;" + comp);
+        }
+
     }
 
 }
