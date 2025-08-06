@@ -676,6 +676,7 @@ public class Generator {
 
     // DV_AMOUNT
 
+    @SuppressWarnings({ "MagicNumber" })
     public void gen_DV_QUANTITY(String path, String name, Object jsonmap,
             Map<String, Object> map, Map<String, Object> datatypes) {
 
@@ -715,7 +716,17 @@ public class Generator {
         ((Element) jsonmap).setValue(new DvCount(map.get(name)));
     }
 
-    // DV_PROPORTION
+    public void gen_DV_PROPORTION(String path, String name, Object jsonmap,
+            Map<String, Object> map, Map<String, Object> datatypes) {
+        switch (map.get(name)) {
+            case String[] s -> {
+                DvProportion dvp = new DvProportion(Double.valueOf(s[0]), Double.valueOf(s[1]), Long.valueOf(s[2]));
+                ((Element) jsonmap).setValue(dvp);
+            }
+            default -> {
+            }
+        }
+    }
 
     // PROPORTION_KIND
 
