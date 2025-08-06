@@ -27,6 +27,7 @@ import com.nedap.archie.rm.datavalues.DvURI;
 import com.nedap.archie.rm.datavalues.quantity.DvCount;
 import com.nedap.archie.rm.datavalues.quantity.DvInterval;
 import com.nedap.archie.rm.datavalues.quantity.DvOrdinal;
+import com.nedap.archie.rm.datavalues.quantity.DvProportion;
 import com.nedap.archie.rm.datavalues.quantity.DvQuantity;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDate;
 import com.nedap.archie.rm.datavalues.quantity.datetime.DvDateTime;
@@ -689,6 +690,9 @@ public class Generator {
                     return;
                 }
                 Long precision = -1L;
+                if (m.length == 3) {
+                    precision = Long.valueOf(m[2]);
+                }
                 String units = (String) m[1];
                 DvQuantity dvq = new DvQuantity(units, Double.valueOf(magnitude), precision);
                 ((Element) jsonmap).setValue(dvq);
