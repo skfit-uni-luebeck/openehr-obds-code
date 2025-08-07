@@ -1,0 +1,57 @@
+build-latest:
+  stage: build
+  tags:
+    - docker
+  image: docker:24.0.7
+  services:
+     - name: docker:24.0.7-dind
+       alias: docker-dind
+  variables:
+     DOCKER_TLS_CERTDIR: ""
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+  script:
+    - ip addr show
+    - docker info || true
+    - docker --version
+    - docker buildx create --use 
+    - mkdir -p /tmp/.buildx-cache
+    - docker build -t $HARBOR_FQDN/highmed/$DOCKER_IMAGE_NAME --build-arg COMMIT_SHA=$CI_COMMIT_SHA .
+    - echo $HARBOR_REGISTRY_HIGHMED_PASSWORD | docker login $HARBOR_FQDN -u $HARBOR_REGISTRY_HIGHMED_USER --password-stdin
+    - docker push $HARBOR_FQDN/highmed/$DOCKER_IMAGE_NAME
+    - rm -rf /tmp/.buildx-cache
+    - '[ -d "/tmp/.buildx-cache-new" ] && mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true'
+  cache:
+    key: "$CI_RUNNER_OS-buildx-$CI_COMMIT_SHA"
+    paths:
+      - /tmp/.buildx-cache
+
+build-release:
+  stage: build
+  tags:
+    - docker
+  image: docker:24.0.7
+  services:
+     - name: docker:24.0.7-dind
+       alias: docker-dind
+  variables:
+     DOCKER_TLS_CERTDIR: ""
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - ip addr show
+    - docker info || true
+    - docker --version
+    - docker buildx create --use 
+    - mkdir -p /tmp/.buildx-cache
+    - docker build -t $HARBOR_FQDN/highmed/$DOCKER_IMAGE_NAME:$CI_COMMIT_TAG .
+    - echo $HARBOR_REGISTRY_HIGHMED_PASSWORD | docker login $HARBOR_FQDN -u $HARBOR_REGISTRY_HIGHMED_USER --password-stdin
+    - docker push $HARBOR_FQDN/highmed/$DOCKER_IMAGE_NAME:$CI_COMMIT_TAG
+    - rm -rf /tmp/.buildx-cache
+    - '[ -d "/tmp/.buildx-cache-new" ] && mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true'
+  cache:
+    key: "$CI_RUNNER_OS-buildx-$CI_COMMIT_SHA"
+    paths:
+      - /tmp/.buildx-cache
+
