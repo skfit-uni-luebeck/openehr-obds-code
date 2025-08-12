@@ -283,7 +283,7 @@ public final class OpenEhrObds {
 
                 Map<String, Object> mapped = localMap(xmlSet, m.getTemplateId(), path);
                 if (mapped == null) {
-                    return;
+                    continue;
                 }
                 if (Settings.getCxxmdr() != null) {
                     mapped.putAll(convertMdr(xmlSet, m));
