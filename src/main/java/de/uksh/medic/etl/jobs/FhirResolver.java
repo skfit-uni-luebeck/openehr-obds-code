@@ -41,7 +41,9 @@ public final class FhirResolver {
     public Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
         String key = String.join("|", conceptMapUri.toString(), system.toString(), source.toString(), target.toString(),
                 input);
-        CACHE_CONCEPTMAP.putIfAbsent(key, conceptMapServer(conceptMapUri, system, source, target, input));
+        if (!CACHE_CONCEPTMAP.containsKey(key)) {
+            CACHE_CONCEPTMAP.put(key, conceptMapServer(conceptMapUri, system, source, target, input));
+        }
         return CACHE_CONCEPTMAP.get(key);
     }
 
@@ -85,7 +87,9 @@ public final class FhirResolver {
 
     public Coding lookUp(URI system, String version, String code) {
         String key = String.join("|", system.toString(), version, code);
-        CACHE_LOOKUP.putIfAbsent(key, lookUpServer(system, version, code));
+        if (!CACHE_LOOKUP.containsKey(key)) {
+            CACHE_LOOKUP.put(key, lookUpServer(system, version, code));
+        }
         return CACHE_LOOKUP.get(key);
     }
 
