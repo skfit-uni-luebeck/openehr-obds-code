@@ -56,7 +56,7 @@ public final class FhirResolver {
         try {
             Parameters result = terminologyClient.operation()
                     .onType("ConceptMap")
-                    .named("translate").withParameters(params).execute();
+                    .named("translate").withParameters(params).useHttpGet().execute();
 
             for (ParametersParameterComponent p : result.getParameter()) {
                 if (!p.getName().equals("match")) {
