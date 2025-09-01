@@ -3,9 +3,12 @@ package de.uksh.medic.etl.jobs;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.exceptions.FhirClientConnectionException;
+import ca.uhn.fhir.rest.client.interceptor.AdditionalRequestHeadersInterceptor;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import de.uksh.medic.etl.settings.Settings;
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 import org.hl7.fhir.r4.model.*;
 import org.hl7.fhir.r4.model.Parameters.ParametersParameterComponent;
 import org.tinylog.Logger;
@@ -16,6 +19,8 @@ import org.tinylog.Logger;
 public final class FhirResolver {
 
     private static final FhirContext CTX = FhirContext.forR4();
+    private static final Map<String, Coding> CACHE_LOOKUP = new HashMap<>();
+    private static final Map<String, Coding> CACHE_CONCEPTMAP = new HashMap<>();
     private static IGenericClient terminologyClient;
 
     /**
@@ -23,11 +28,24 @@ public final class FhirResolver {
      */
     public FhirResolver() {
         if (Settings.getFhirTsUrl() != null) {
+            String topicName = (Settings.getKafka() != null && Settings.getKafka().getReadTopic() != null
+                    && !"".equals(Settings.getKafka().getReadTopic())) ? Settings.getKafka().getReadTopic()
+                            : "JVM-ETL Dev";
             terminologyClient = CTX.newRestfulGenericClient(Settings.getFhirTsUrl().toString());
+            AdditionalRequestHeadersInterceptor interceptor = new AdditionalRequestHeadersInterceptor();
+            interceptor.addHeaderValue("User-Agent", topicName);
+            terminologyClient.registerInterceptor(interceptor);
         }
     }
 
     public Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
+        String key = String.join("|", conceptMapUri.toString(), system.toString(), source.toString(), target.toString(),
+                input);
+        CACHE_CONCEPTMAP.putIfAbsent(key, conceptMapServer(conceptMapUri, system, source, target, input));
+        return CACHE_CONCEPTMAP.get(key);
+    }
+
+    public Coding conceptMapServer(URI conceptMapUri, URI system, URI source, URI target, String input) {
         Parameters params = new Parameters();
         params.addParameter("system", new UriType(system));
         params.addParameter("source", new UriType(source));
@@ -66,13 +84,19 @@ public final class FhirResolver {
     }
 
     public Coding lookUp(URI system, String version, String code) {
+        String key = String.join("|", system.toString(), version, code);
+        CACHE_LOOKUP.putIfAbsent(key, lookUpServer(system, version, code));
+        return CACHE_LOOKUP.get(key);
+    }
+
+    public Coding lookUpServer(URI system, String version, String code) {
         Parameters params = new Parameters();
         params.addParameter("system", new UriType(system));
         params.addParameter("code", code);
         params.addParameter("version", version);
         try {
             Parameters result = terminologyClient.operation().onType(CodeSystem.class)
-                    .named("lookup").withParameters(params).execute();
+                    .named("lookup").withParameters(params).useHttpGet().execute();
 
             Coding coding = new Coding();
             for (ParametersParameterComponent p : result.getParameter()) {
