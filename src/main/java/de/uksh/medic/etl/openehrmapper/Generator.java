@@ -448,6 +448,7 @@ public class Generator {
         l.forEach(le -> {
 
             Cluster cluster = new Cluster();
+            cluster.setArchetypeDetails(new Archetyped(new ArchetypeID(paramName), "1.1.0"));
             cluster.setArchetypeNodeId(aNodeId);
             cluster.setNameAsString(label);
             ArrayList<Item> items = new ArrayList<>();
