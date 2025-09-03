@@ -5,7 +5,7 @@ WORKDIR /openehr-obds
 RUN mvn -DskipTests clean package
 
 FROM gcr.io/distroless/java21-debian12
-COPY --from=curlBin /bin/curl /usr/bin/curl
+COPY --from=curlBin /bin/wget /usr/bin/wget
 COPY --from=build /openehr-obds/target/openehr-obds-*-jar-with-dependencies.jar /app/openehr-obds.jar
 ENTRYPOINT ["java", "-jar", "/app/openehr-obds.jar"]
-HEALTHCHECK CMD curl --fail http://localhost:4567/health || exit 1
+HEALTHCHECK CMD wget -q -S -O - http://localhost:4567/health || exit 1
