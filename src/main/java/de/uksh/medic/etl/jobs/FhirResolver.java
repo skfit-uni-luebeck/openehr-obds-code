@@ -19,7 +19,7 @@ import org.tinylog.Logger;
  */
 public final class FhirResolver {
 
-    private static final int CACHESIZE = 10000;
+    private static final int CACHESIZE = Settings.getCacheSize();
     private static final FhirContext CTX = FhirContext.forR4();
     private static final Cache<String, Coding> CACHE_LOOKUP = Caffeine.newBuilder()
             .expireAfterAccess(24, TimeUnit.HOURS).maximumSize(CACHESIZE).build();

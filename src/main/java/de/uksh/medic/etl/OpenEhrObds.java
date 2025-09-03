@@ -125,7 +125,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testData/meona/order/orders").listFiles();
+            File[] files = new File("testData/prozedur/fail").listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
                     continue;

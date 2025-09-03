@@ -26,6 +26,7 @@ public final class Settings {
     private static String systemId;
     private static boolean dev;
     private static String namespace;
+    private static int cacheSize;
 
     private Settings() {}
 
@@ -144,6 +145,15 @@ public final class Settings {
     @JsonProperty("namespace")
     public void setNamespace(String newNamespace) {
         namespace = newNamespace;
+    }
+
+    public static int getCacheSize() {
+        return cacheSize;
+    }
+
+    @JsonProperty("cacheSize")
+    public void setCacheSize(int newCacheSize) {
+        cacheSize = newCacheSize;
     }
 
 }
