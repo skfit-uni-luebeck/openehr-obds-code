@@ -7,6 +7,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.nedap.archie.json.JacksonUtil;
 import com.nedap.archie.rm.composition.Composition;
 import com.nedap.archie.rm.datavalues.DvText;
@@ -37,6 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 import javax.xml.namespace.QName;
 import javax.xml.xpath.XPathExpressionException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -57,6 +60,8 @@ import org.tinylog.Logger;
 
 public final class OpenEhrObds {
 
+    private static final Cache<String, Object> SPEED = Caffeine.newBuilder()
+        .expireAfterWrite(60, TimeUnit.SECONDS).build();
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, Object> OPENEHR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
@@ -111,17 +116,23 @@ public final class OpenEhrObds {
 
         Settings.getMapping().values().forEach(m -> m.forEach(n -> initializeAttribute(n, jm)));
 
+        spark.Spark.get("/health", (request, response) -> {
+            response.type("application/json");
+            return "{\"msgsPerMinute\": " + SPEED.estimatedSize() + "}";
+        });
+
         Logger.info("OpenEhrObds started!");
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testData/prozedur/fail").listFiles();
+            File[] files = new File("testData/meona/order/orders").listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
                     continue;
                 }
                 walkTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
                 }).entrySet(), 1, "", new LinkedHashMap<>());
+                SPEED.put(UUID.randomUUID().toString(), "success");
             }
             System.exit(0);
         }
@@ -162,6 +173,7 @@ public final class OpenEhrObds {
                         producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
                         producer.flush();
                     }
+                    SPEED.put(UUID.randomUUID().toString(), "success");
                 }
                 consumer.commitSync();
             }

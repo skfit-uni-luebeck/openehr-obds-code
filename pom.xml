@@ -113,13 +113,23 @@
             <artifactId>groovy-all</artifactId>
             <version>3.0.24</version>
             <type>pom</type>
-          </dependency>
-          <dependency>
+        </dependency>
+        <dependency>
             <groupId>org.codehaus.groovy</groupId>
             <artifactId>groovy-dateutil</artifactId>
             <version>3.0.24</version>
             <classifier>indy</classifier>
-          </dependency>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>3.2.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.zoomba-lang</groupId>
+            <artifactId>spark-core</artifactId>
+            <version>3.0.2</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
