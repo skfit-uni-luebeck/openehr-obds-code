@@ -5,10 +5,11 @@ import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.exceptions.FhirClientConnectionException;
 import ca.uhn.fhir.rest.client.interceptor.AdditionalRequestHeadersInterceptor;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import de.uksh.medic.etl.settings.Settings;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.hl7.fhir.r4.model.*;
 import org.hl7.fhir.r4.model.Parameters.ParametersParameterComponent;
 import org.tinylog.Logger;
@@ -18,9 +19,12 @@ import org.tinylog.Logger;
  */
 public final class FhirResolver {
 
+    private static final int CACHESIZE = 10000;
     private static final FhirContext CTX = FhirContext.forR4();
-    private static final Map<String, Coding> CACHE_LOOKUP = new HashMap<>();
-    private static final Map<String, Coding> CACHE_CONCEPTMAP = new HashMap<>();
+    private static final Cache<String, Coding> CACHE_LOOKUP = Caffeine.newBuilder()
+            .expireAfterAccess(24, TimeUnit.HOURS).maximumSize(CACHESIZE).build();
+    private static final Cache<String, Coding> CACHE_CONCEPTMAP = Caffeine.newBuilder()
+            .expireAfterAccess(24, TimeUnit.HOURS).maximumSize(CACHESIZE).build();
     private static IGenericClient terminologyClient;
 
     /**
@@ -41,10 +45,12 @@ public final class FhirResolver {
     public Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
         String key = String.join("|", conceptMapUri.toString(), system.toString(), source.toString(), target.toString(),
                 input);
-        if (!CACHE_CONCEPTMAP.containsKey(key)) {
-            CACHE_CONCEPTMAP.put(key, conceptMapServer(conceptMapUri, system, source, target, input));
+        Coding c = CACHE_CONCEPTMAP.getIfPresent(key);
+        if (c == null) {
+            c = conceptMapServer(conceptMapUri, system, source, target, input);
+            CACHE_CONCEPTMAP.put(key, c);
         }
-        return CACHE_CONCEPTMAP.get(key);
+        return c;
     }
 
     public Coding conceptMapServer(URI conceptMapUri, URI system, URI source, URI target, String input) {
@@ -87,10 +93,12 @@ public final class FhirResolver {
 
     public Coding lookUp(URI system, String version, String code) {
         String key = String.join("|", system.toString(), version, code);
-        if (!CACHE_LOOKUP.containsKey(key)) {
-            CACHE_LOOKUP.put(key, lookUpServer(system, version, code));
+        Coding c = CACHE_LOOKUP.getIfPresent(key);
+        if (c == null) {
+            c = lookUpServer(system, version, code);
+            CACHE_LOOKUP.put(key, c);
         }
-        return CACHE_LOOKUP.get(key);
+        return c;
     }
 
     public Coding lookUpServer(URI system, String version, String code) {
