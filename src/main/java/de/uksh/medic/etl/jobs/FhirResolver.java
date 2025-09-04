@@ -48,7 +48,9 @@ public final class FhirResolver {
         Coding c = CACHE_CONCEPTMAP.getIfPresent(key);
         if (c == null) {
             c = conceptMapServer(conceptMapUri, system, source, target, input);
-            CACHE_CONCEPTMAP.put(key, c);
+            if (c != null) {
+                CACHE_CONCEPTMAP.put(key, c);
+            }
         }
         return c;
     }
@@ -96,7 +98,9 @@ public final class FhirResolver {
         Coding c = CACHE_LOOKUP.getIfPresent(key);
         if (c == null) {
             c = lookUpServer(system, version, code);
-            CACHE_LOOKUP.put(key, c);
+            if (c != null) {
+                CACHE_LOOKUP.put(key, c);
+            }
         }
         return c;
     }
