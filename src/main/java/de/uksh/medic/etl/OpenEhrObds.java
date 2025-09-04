@@ -42,6 +42,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import javax.xml.namespace.QName;
 import javax.xml.xpath.XPathExpressionException;
+import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -61,7 +62,7 @@ import org.tinylog.Logger;
 public final class OpenEhrObds {
 
     private static final Cache<String, Object> SPEED = Caffeine.newBuilder()
-        .expireAfterWrite(60, TimeUnit.SECONDS).build();
+            .expireAfterWrite(60, TimeUnit.SECONDS).build();
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, Object> OPENEHR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
@@ -137,48 +138,54 @@ public final class OpenEhrObds {
             System.exit(0);
         }
 
-        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(KafkaUtils.getConsumerProperties());
-                KafkaProducer<String, String> producer = new KafkaProducer<>(KafkaUtils.getProducerProperties())) {
-            final Thread mainThread = Thread.currentThread();
+        while (true) {
+            try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(KafkaUtils.getConsumerProperties());
+                    KafkaProducer<String, String> producer = new KafkaProducer<>(KafkaUtils.getProducerProperties())) {
+                final Thread mainThread = Thread.currentThread();
 
-            // adding the shutdown hook
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                Logger.info("Shutdown detected, calling consumer.wakeup()...");
-                consumer.wakeup();
+                // adding the shutdown hook
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    Logger.info("Shutdown detected, calling consumer.wakeup()...");
+                    consumer.wakeup();
 
-                // join the main thread to allow the execution of the code in the main thread
-                try {
-                    mainThread.join();
-                } catch (InterruptedException e) {
-                    Logger.error(e);
-                }
-            }));
-
-            consumer.subscribe(Collections.singleton(Settings.getKafka().getReadTopic()));
-
-            while (true) {
-                Logger.debug("Polling Kafka topic");
-                ConsumerRecords<String, String> records = consumer.poll(
-                        Duration.ofMillis(Settings.getKafka().getPollDuration()));
-
-                for (ConsumerRecord<String, String> record : records) {
-                    Logger.debug("Processing record.");
+                    // join the main thread to allow the execution of the code in the main thread
                     try {
-                        walkTree(mapper.readValue(record.value(),
-                                new TypeReference<LinkedHashMap<String, Object>>() {
-                                }).entrySet(), 1, "",
-                                new LinkedHashMap<>());
-                    } catch (ProcessingException e) {
-                        Logger.error("ProcessingException occured, writing to error topic!");
-                        producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
-                        producer.flush();
+                        mainThread.join();
+                    } catch (InterruptedException e) {
+                        Logger.error(e);
                     }
-                    SPEED.put(UUID.randomUUID().toString(), "success");
+                }));
+
+                consumer.subscribe(Collections.singleton(Settings.getKafka().getReadTopic()));
+
+                while (true) {
+                    Logger.debug("Polling Kafka topic");
+                    ConsumerRecords<String, String> records = consumer.poll(
+                            Duration.ofMillis(Settings.getKafka().getPollDuration()));
+
+                    for (ConsumerRecord<String, String> record : records) {
+                        Logger.debug("Processing record.");
+                        try {
+                            walkTree(mapper.readValue(record.value(),
+                                    new TypeReference<LinkedHashMap<String, Object>>() {
+                                    }).entrySet(), 1, "",
+                                    new LinkedHashMap<>());
+                        } catch (ProcessingException e) {
+                            Logger.error("ProcessingException occured, writing to error topic!");
+                            producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
+                            producer.flush();
+                        }
+                        SPEED.put(UUID.randomUUID().toString(), "success");
+                    }
+                    try {
+                        consumer.commitSync();
+                    } catch (CommitFailedException e) {
+                        Logger.debug("Got kicked out of consumer group.");
+                    }
                 }
-                consumer.commitSync();
+            } catch (WakeupException e) {
+                Logger.debug("Caught wake up exception.");
             }
-        } catch (WakeupException e) {
-            Logger.debug("Caught wake up exception.");
         }
     }
 
