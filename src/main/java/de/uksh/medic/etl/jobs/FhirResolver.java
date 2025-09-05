@@ -89,7 +89,7 @@ public final class FhirResolver {
             Logger.error("Could not connect to FHIR Terminology Server", e);
         }
 
-        Logger.warn("Could not map code %s from %s to %s", input, source, target);
+        Logger.warn("Could not map code {} from {} to {}", input, source, target);
         return null;
     }
 
