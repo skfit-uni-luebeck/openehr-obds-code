@@ -119,7 +119,7 @@ public final class OpenEhrObds {
 
         spark.Spark.get("/health", (request, response) -> {
             response.type("application/json");
-            return "{\"msgsPerMinute\": " + SPEED.estimatedSize() + "}";
+            return "{\"msgsPerMinute\": " + SPEED.estimatedSize() + ", \"cacheSize\": " + fr.getCacheSize() + "}";
         });
 
         Logger.info("OpenEhrObds started!");

@@ -141,4 +141,9 @@ public final class FhirResolver {
         return null;
     }
 
+    public String getCacheSize() {
+        return "{\"lookup\": " + CACHE_LOOKUP.estimatedSize() + ", \"conceptMap\": " + CACHE_CONCEPTMAP.estimatedSize()
+                + "}";
+    }
+
 }
