@@ -3,6 +3,7 @@ package de.uksh.medic.etl;
 import com.nedap.archie.rm.support.identification.ObjectVersionId;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.settings.Settings;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.ehrbase.openehr.sdk.client.openehrclient.defaultrestclient.DefaultRestClient;
@@ -30,16 +31,12 @@ public final class OpenEhrUtils {
             return;
         }
 
-        if (ehrIds.getRows().size() > 1) {
-            Logger.error("Found more than one composition to delete for ID: {} from system: {}!"
-                    + " This should not happen!", itemId, Settings.getSystemId());
-            throw new ProcessingException();
+        for (List<Object> l : ehrIds.getRows()) {
+            UUID ehrId = UUID.fromString((String) l.getFirst());
+            ObjectVersionId versionId = new ObjectVersionId((String) l.getLast());
+            Logger.info("Deleting composition {} from ehr {}", versionId, ehrId);
+            openEhrClient.compositionEndpoint(ehrId).delete(versionId);
         }
-
-        UUID ehrId = UUID.fromString((String) ehrIds.getRows().getFirst().getFirst());
-        ObjectVersionId versionId = new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast());
-        Logger.info("Deleting composition {} from ehr {}", versionId, ehrId);
-        openEhrClient.compositionEndpoint(ehrId).delete(versionId);
         return;
     }
 
@@ -59,12 +56,18 @@ public final class OpenEhrUtils {
         }
 
         if (ehrIds.getRows().size() > 1) {
-            Logger.error("Found more than one composition for ID: {} from system: {}!"
-                    + " This should not happen!", itemId, Settings.getSystemId());
-            throw new ProcessingException();
+            Logger.warn("Found more than one composition for ID: {} from system: {}!"
+                    + " This should not happen! Deleting all but the latest.", itemId, Settings.getSystemId());
+            for (int i = 1; i < ehrIds.getRows().size(); i++) {
+                List<Object> l = ehrIds.getRows().get(i);
+                UUID ehrId = UUID.fromString((String) l.getFirst());
+                ObjectVersionId versionId = new ObjectVersionId((String) l.getLast());
+                Logger.info("Deleting composition {} from ehr {}", versionId, ehrId);
+                openEhrClient.compositionEndpoint(ehrId).delete(versionId);
+            }
         }
 
-        return new ObjectVersionId((String) ehrIds.getRows().getFirst().getFirst());
+        return new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast());
     }
 
 }
