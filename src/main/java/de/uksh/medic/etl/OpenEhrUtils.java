@@ -3,6 +3,7 @@ package de.uksh.medic.etl;
 import com.nedap.archie.rm.support.identification.ObjectVersionId;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.settings.Settings;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,11 +41,15 @@ public final class OpenEhrUtils {
         return;
     }
 
-    protected static ObjectVersionId getVersionUid(DefaultRestClient openEhrClient, Map<String, MappingAttributes> aqls,
+    protected static Map<String, Object> getVersionUid(DefaultRestClient openEhrClient,
+            Map<String, MappingAttributes> aqls,
             String templateId, String itemId) throws ProcessingException {
+
+        Map<String, Object> oviMap = new HashMap<>();
+
         if (!aqls.containsKey(templateId) || aqls.get(templateId).getUpdateAql() == null) {
             Logger.warn("Cannot update composition because updateAql query not set.");
-            return null;
+            return oviMap;
         }
         QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                 String.format(aqls.get(templateId).getUpdateAql(), templateId,
@@ -52,7 +57,7 @@ public final class OpenEhrUtils {
         if (ehrIds.getRows() == null) {
             Logger.info("No composition found for templateId {}, originalId {} from system: {}",
                     templateId, itemId, Settings.getSystemId());
-            return null;
+            return oviMap;
         }
 
         if (ehrIds.getRows().size() > 1) {
@@ -67,7 +72,10 @@ public final class OpenEhrUtils {
             }
         }
 
-        return new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast());
+        oviMap.put("ehr_id", UUID.fromString((String) ehrIds.getRows().getFirst().getFirst()));
+        oviMap.put("ovi", new ObjectVersionId((String) ehrIds.getRows().getFirst().getLast()));
+
+        return oviMap;
     }
 
 }

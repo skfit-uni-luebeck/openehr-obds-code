@@ -446,8 +446,12 @@ public final class OpenEhrObds {
             throw new ProcessingException();
         }
 
-        ObjectVersionId ovi = OpenEhrUtils.getVersionUid(openEhrClient, AQLS, templateId,
+        Map<String, Object> oviMap = OpenEhrUtils.getVersionUid(openEhrClient, AQLS, templateId,
                 ((List<String>) data.get("identifier")).getFirst());
+        ObjectVersionId ovi = (ObjectVersionId) oviMap.get("ovi");
+        if (oviMap.containsKey("ehr_id")) {
+            ehrId = (UUID) oviMap.get("ehr_id");
+        }
         if (ovi != null) {
             composition.setUid(ovi);
         }
