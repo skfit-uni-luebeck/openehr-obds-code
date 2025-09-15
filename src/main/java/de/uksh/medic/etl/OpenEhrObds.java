@@ -423,15 +423,16 @@ public final class OpenEhrObds {
         }
 
         String ehrIdString = ((List<String>) data.get("ehr_id")).getFirst();
+        String namespace = data.containsKey("namespace") ? ((List<String>) data.get("namespace")).getFirst()
+                : Settings.getNamespace();
         QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                 "SELECT e/ehr_id/value as EHR_ID"
                         + " FROM EHR e WHERE e/ehr_status/subject/external_ref/id/value = '"
-                        + ehrIdString + "'"));
+                        + ehrIdString + "' AND e/ehr_status/subject/external_ref/namespace = '"
+                        + namespace + "'"));
         UUID ehrId;
         if (ehrIds.getRows() == null) {
             EhrStatus es = new EhrStatus();
-            String namespace = data.containsKey("namespace") ? ((List<String>) data.get("namespace")).getFirst()
-                    : Settings.getNamespace();
             es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
             es.setName(new DvText("EHR status"));
             es.setQueryable(true);
