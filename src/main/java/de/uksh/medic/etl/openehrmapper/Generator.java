@@ -989,7 +989,7 @@ public class Generator {
                 if (value1 instanceof Map && value2 instanceof Map) {
                     deepMergeNoReplace((Map<String, Object>) value1, (Map<String, Object>) value2);
                 } else if (value1 instanceof List && value2 instanceof List) {
-                    map1.put(key, mergeNoReplace((List) value1, (List) value2));
+                    map1.put(key, mergeNoReplace((List) value2, (List) value1));
                 } else {
                     map1.put(key, value2);
                 }
