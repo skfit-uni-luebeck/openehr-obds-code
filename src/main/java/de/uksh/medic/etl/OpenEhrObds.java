@@ -214,7 +214,6 @@ public final class OpenEhrObds {
         if (m.getSource() == null) {
             return;
         }
-        File aqlFile = new File("scripts/aqls.json");
         if (Settings.getCxxmdr() != null) {
             CxxItemSet is = CxxMdrItemSet.get(Settings.getCxxmdr(), m.getTarget());
             is.getItems().forEach(it -> {
@@ -235,12 +234,29 @@ public final class OpenEhrObds {
                     Utils.formatMap((Map<String, Object>) OPENEHR_ATTRIBUTES.get(m.getTemplateId())));
             AQLS.put(m.getTemplateId(),
                     CxxMdrAttributes.getProfileAttributes(Settings.getCxxmdr(), m.getTarget(), "openehr"));
-        } else if (aqlFile.exists()) {
-            try {
-                AQLS.putAll(mapper.readValue(aqlFile, new TypeReference<Map<String, MappingAttributes>>() {
-                }));
-            } catch (IOException e) {
-                Logger.error(e);
+        } else {
+            File aqlFile = new File("scripts/aqls.json");
+            File datatypesFile = new File("scripts/" + m.getTemplateId() + ".json");
+            if (aqlFile.exists()) {
+                try {
+                    AQLS.putAll(mapper.readValue(aqlFile, new TypeReference<Map<String, MappingAttributes>>() {
+                    }));
+                } catch (IOException e) {
+                    Logger.error(e);
+                }
+            }
+            if (datatypesFile.exists()) {
+                try {
+                    Map<String, MappingAttributes> oemap = mapper.readValue(datatypesFile,
+                            new TypeReference<Map<String, MappingAttributes>>() {
+                            });
+                    Map<String, Object> tmpMap = new HashMap<>();
+                    tmpMap.put(m.getTemplateId(), oemap);
+                    openehrDatatypes.put(m.getTemplateId(),
+                            Utils.formatMap((Map<String, Object>) tmpMap.get(m.getTemplateId())));
+                } catch (IOException e) {
+                    Logger.error(e);
+                }
             }
         }
     }
