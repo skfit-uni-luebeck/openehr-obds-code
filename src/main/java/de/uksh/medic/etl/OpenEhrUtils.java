@@ -26,7 +26,7 @@ public final class OpenEhrUtils {
         QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                 String.format(aqls.get(templateId).getDeleteAql(), templateId,
                         Settings.getSystemId(), itemId)));
-        if (ehrIds.getRows() == null) {
+        if (ehrIds.getRows() == null || ehrIds.getRows().isEmpty()) {
             Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
                     templateId, itemId, Settings.getSystemId());
             return;
@@ -54,7 +54,7 @@ public final class OpenEhrUtils {
         QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                 String.format(aqls.get(templateId).getUpdateAql(), templateId,
                         Settings.getSystemId(), itemId)));
-        if (ehrIds.getRows() == null) {
+        if (ehrIds.getRows() == null || ehrIds.getRows().isEmpty()) {
             Logger.info("No composition found for templateId {}, originalId {} from system: {}",
                     templateId, itemId, Settings.getSystemId());
             return oviMap;

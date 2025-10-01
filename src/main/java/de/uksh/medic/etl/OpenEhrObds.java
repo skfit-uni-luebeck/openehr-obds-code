@@ -447,7 +447,7 @@ public final class OpenEhrObds {
                         + ehrIdString + "' AND e/ehr_status/subject/external_ref/namespace = '"
                         + namespace + "'"));
         UUID ehrId;
-        if (ehrIds.getRows() == null) {
+        if (ehrIds.getRows() == null || ehrIds.getRows().isEmpty()) {
             EhrStatus es = new EhrStatus();
             es.setArchetypeNodeId("openEHR-EHR-EHR_STATUS.generic.v1");
             es.setName(new DvText("EHR status"));
