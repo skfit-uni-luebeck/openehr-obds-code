@@ -141,6 +141,76 @@ public final class FhirResolver {
         return null;
     }
 
+    public Coding lookUpDesignation(URI system, String version, String code, String designation) {
+        String key = String.join("|", system.toString(), version, code, designation);
+        Coding c = CACHE_LOOKUP.getIfPresent(key);
+        if (c == null) {
+            c = lookUpServerDesignation(system, version, code, designation);
+            if (c != null) {
+                CACHE_LOOKUP.put(key, c);
+            }
+        }
+        return c;
+    }
+
+    public Coding lookUpServerDesignation(URI system, String version, String code, String designation) {
+        Parameters params = new Parameters();
+        params.addParameter("system", new UriType(system));
+        params.addParameter("code", code);
+        params.addParameter("version", version);
+        try {
+            Parameters result = terminologyClient.operation().onType(CodeSystem.class)
+                    .named("lookup").withParameters(params).useHttpGet().execute();
+
+            Coding coding = new Coding();
+            String designatedDisplay = null;
+            for (ParametersParameterComponent p : result.getParameter()) {
+                switch (p.getName()) {
+                    case "display" -> coding.setDisplayElement((StringType) p.getValue());
+                    case "version" -> coding.setVersionElement((StringType) p.getValue());
+                    case "system" -> coding.setSystemElement((UriType) p.getValue());
+                    case "code" -> coding.setCodeElement((CodeType) p.getValue());
+                    case "designation" -> {
+                        String value = null;
+                        boolean use = false;
+                        boolean language = false;
+                        for (ParametersParameterComponent pcp : p.getPart()) {
+                            switch (pcp.getName()) {
+                                case "language" ->
+                                    language = designation.equals(((StringType) pcp.getValue()).getValueAsString());
+                                case "use" -> use = "preferredForLanguage".equals(((Coding) pcp.getValue()).getCode());
+                                case "value" -> value = ((StringType) pcp.getValue()).getValueAsString();
+                                default -> {
+                                }
+                            }
+                        }
+                        if (language && use && value != null) {
+                            designatedDisplay = value;
+                        }
+                    }
+                    default -> {
+                    }
+                }
+            }
+
+            if (designatedDisplay != null) {
+                coding.setDisplay(designatedDisplay);
+            }
+            if (version == null) {
+                return coding.setVersion(null);
+            }
+
+            return coding;
+
+        } catch (FhirClientConnectionException e) {
+            Logger.error("Could not connect to FHIR Terminology Server", e);
+        } catch (ResourceNotFoundException e) {
+            Logger.error("Could not look up because system was not found.");
+        }
+
+        return null;
+    }
+
     public String getCacheSize() {
         return "{\"lookup\": " + CACHE_LOOKUP.estimatedSize() + ", \"conceptMap\": " + CACHE_CONCEPTMAP.estimatedSize()
                 + "}";
