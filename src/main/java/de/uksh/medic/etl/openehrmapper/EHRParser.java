@@ -119,7 +119,7 @@ public class EHRParser {
         EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
                 new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
         if (map.containsKey("end_time")) {
-            context.setEndTime(new DvDateTime((String) map.get("end_time")));
+            context.setEndTime(new DvDateTime(((List<String>) map.get("end_time")).get(0)));
         }
         if (map.containsKey("health_care_facility")) {
             Map<String, List<String>> hcf = (Map<String, List<String>>) map.get("health_care_facility");
