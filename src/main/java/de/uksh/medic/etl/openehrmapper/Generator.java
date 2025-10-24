@@ -700,11 +700,14 @@ public class Generator {
                 ((Element) jsonmap).setValue(dvq);
             }
             case Quantity q -> {
-                if (q.getUnit() == null) {
-                    q.setUnit("1");
+                if (q.getCode() == null) {
+                    q.setCode("1");
                 }
-                DvQuantity dvq = new DvQuantity(q.getUnit(), q.getValue().doubleValue(),
+                DvQuantity dvq = new DvQuantity(q.getCode(), q.getValue().doubleValue(),
                         Long.valueOf(q.getValue().precision()));
+                if (q.getUnit() != null) {
+                    dvq.setUnitsDisplayName(q.getUnit());
+                }
                 ((Element) jsonmap).setValue(dvq);
             }
             default -> {
