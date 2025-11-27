@@ -405,7 +405,7 @@ public class Generator {
 
         ItemTree itemTree = (ItemTree) jsonmap;
         itemTree.setArchetypeNodeId(nodeId);
-        itemTree.setNameAsString("data"); // fix name
+        itemTree.setNameAsString(getLabel(path, nodeId, name));
         ArrayList<Item> items = new ArrayList<>();
         itemTree.setItems(items);
         processAttributeChildren(newPath, name, items, map, datatypes);
