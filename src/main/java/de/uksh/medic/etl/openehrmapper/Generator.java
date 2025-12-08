@@ -842,7 +842,20 @@ public class Generator {
             cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         if ("".equals(cache.get(newPath))) {
-            return getElementLabel(path + "/../..", code, archetype);
+            return getElementLabelLoop(path + "/..", code, archetype);
+        }
+        return cache.get(newPath);
+    }
+
+    private String getElementLabelLoop(String path, String code, String archetype) throws Exception {
+        String newPath = path + "/../../term_definitions[@code=\"" + code
+                + "\"]/items[@id=\"text\"]/text()";
+        if (!cache.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if ("".equals(cache.get(newPath))) {
+            return getElementLabelLoop(path + "/..", code, archetype);
         }
         return cache.get(newPath);
     }
