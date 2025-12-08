@@ -181,6 +181,8 @@ public class Generator {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
         Boolean oa = (Boolean) XP.evaluate(oap, opt, XPathConstants.BOOLEAN);
+        String oapProtocol = path + "/attributes[rm_attribute_name=\"protocol\"]";
+        Boolean oaProtocol = (Boolean) XP.evaluate(oapProtocol, opt, XPathConstants.BOOLEAN);
         String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
@@ -204,7 +206,11 @@ public class Generator {
             processAttributeChildren(oap, paramName, history, le,
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             observation.setData(history);
-            if (oa) {
+            ItemTree protocol = new ItemTree();
+            processAttributeChildren(oapProtocol, paramName, protocol, le,
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+            observation.setProtocol(protocol);
+            if (oa || oaProtocol) {
                 ((List<ContentItem>) jsonmap).add(observation);
             }
         });
@@ -410,7 +416,7 @@ public class Generator {
         itemTree.setItems(items);
         processAttributeChildren(newPath, name, items, map, datatypes);
     }
-
+    
     // Representation Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_structures.html#_class_descriptions_3
 
