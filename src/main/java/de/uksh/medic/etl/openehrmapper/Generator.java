@@ -416,7 +416,7 @@ public class Generator {
         itemTree.setItems(items);
         processAttributeChildren(newPath, name, items, map, datatypes);
     }
-    
+
     // Representation Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_structures.html#_class_descriptions_3
 
