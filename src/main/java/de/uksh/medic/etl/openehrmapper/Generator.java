@@ -205,11 +205,15 @@ public class Generator {
             History<ItemStructure> history = new History<>();
             processAttributeChildren(oap, paramName, history, le,
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            observation.setData(history);
+            if (history.getEvents().size() > 0) {
+                observation.setData(history);
+            }
             ItemTree protocol = new ItemTree();
             processAttributeChildren(oapProtocol, paramName, protocol, le,
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            observation.setProtocol(protocol);
+            if (protocol.getItems().size() > 0) {
+                observation.setProtocol(protocol);
+            }
             if (oa || oaProtocol) {
                 ((List<ContentItem>) jsonmap).add(observation);
             }
@@ -251,11 +255,15 @@ public class Generator {
             ItemTree data = new ItemTree();
             processAttributeChildren(oap, paramName, data, le,
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            evaluation.setData(data);
+            if (data.getItems().size() > 0) {
+                evaluation.setData(data);
+            }
             ItemTree protocol = new ItemTree();
             processAttributeChildren(oapProtocol, paramName, protocol, le,
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            evaluation.setProtocol(protocol);
+            if (protocol.getItems().size() > 0) {
+                evaluation.setProtocol(protocol);
+            }
             if (oa || oaProtocol) {
                 ((List<ContentItem>) jsonmap).add(evaluation);
             }
@@ -298,8 +306,12 @@ public class Generator {
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             processAttributeChildren(oapProtocol, paramName, protocol, le,
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            instruction.setActivities(activities);
-            instruction.setProtocol(protocol);
+            if (activities.size() > 0) {
+                instruction.setActivities(activities);
+            }
+            if (protocol.getItems().size() > 0) {
+                instruction.setProtocol(protocol);
+            }
             if (oaActivities || oaProtocol) {
                 ((ArrayList<ContentItem>) jsonmap).add(instruction);
             }
@@ -376,9 +388,12 @@ public class Generator {
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
             processAttributeChildren(oapProtocol, paramName, protocol, le,
                     (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
-            action.setDescription(description);
-            action.setProtocol(protocol);
-
+            if (description.getItems().size() > 0) {
+                action.setDescription(description);
+            }
+            if (protocol.getItems().size() > 0) {
+                action.setProtocol(protocol);
+            }
             if (oaDescription || oaProtocol) {
                 ((ArrayList<ContentItem>) jsonmap).add(action);
             }
