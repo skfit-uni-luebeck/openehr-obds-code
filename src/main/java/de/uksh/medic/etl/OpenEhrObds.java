@@ -344,8 +344,11 @@ public final class OpenEhrObds {
                 if (update && result.containsKey("delete")
                         && Boolean.TRUE.equals(((List<Boolean>) result.get("delete")).getFirst())) {
                     Logger.info("Found DELETE entry, trying to delete composition...");
+                    String systemId = result.containsKey("systemId")
+                            ? ((List<String>) result.get("systemId")).getFirst()
+                            : Settings.getSystemId();
                     OpenEhrUtils.deleteOpenEhrComposition(openEhrClient, AQLS, m.getTemplateId(),
-                            ((List<String>) result.get("identifier")).getFirst());
+                            ((List<String>) result.get("identifier")).getFirst(), systemId);
                     return;
                 }
 
@@ -475,8 +478,10 @@ public final class OpenEhrObds {
             }
         } while (ehrId == null);
 
+        String systemId = composition.getFeederAudit().getOriginatingSystemItemIds().getFirst().getId();
+
         Map<String, Object> oviMap = OpenEhrUtils.getVersionUid(openEhrClient, AQLS, templateId,
-                ((List<String>) data.get("identifier")).getFirst());
+                ((List<String>) data.get("identifier")).getFirst(), systemId);
         ObjectVersionId ovi = (ObjectVersionId) oviMap.get("ovi");
         if (oviMap.containsKey("ehr_id")) {
             ehrId = (UUID) oviMap.get("ehr_id");

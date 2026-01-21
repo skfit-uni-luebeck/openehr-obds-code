@@ -91,8 +91,10 @@ public class EHRParser {
         composition.setCategory(new DvCodedText("event", new CodePhrase(new TerminologyId("openehr"), "433")));
         composition.setComposer(new PartySelf());
 
-        Logger.debug("Setting Feeder_Audit System-ID to {}", Settings.getSystemId());
-        FeederAuditDetails details = new FeederAuditDetails(Settings.getSystemId());
+        String systemId = map.containsKey("systemId") ? ((List<String>) map.get("systemId")).getFirst()
+                : Settings.getSystemId();
+        Logger.debug("Setting Feeder_Audit System-ID to {}", systemId);
+        FeederAuditDetails details = new FeederAuditDetails(systemId);
 
         List<String> list = (List<String>) map.get("identifier");
         FeederAudit audit;

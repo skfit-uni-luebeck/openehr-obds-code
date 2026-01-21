@@ -2,7 +2,6 @@ package de.uksh.medic.etl;
 
 import com.nedap.archie.rm.support.identification.ObjectVersionId;
 import de.uksh.medic.etl.model.MappingAttributes;
-import de.uksh.medic.etl.settings.Settings;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,17 +17,17 @@ public final class OpenEhrUtils {
     }
 
     protected static void deleteOpenEhrComposition(DefaultRestClient openEhrClient, Map<String, MappingAttributes> aqls,
-            String templateId, String itemId) throws ProcessingException {
+            String templateId, String itemId, String systemId) throws ProcessingException {
         if (aqls.get(templateId).getDeleteAql() == null) {
             Logger.warn("Cannot delete composition because deleteAql query not set.");
             return;
         }
         QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                 String.format(aqls.get(templateId).getDeleteAql(), templateId,
-                        Settings.getSystemId(), itemId)));
+                        systemId, itemId)));
         if (ehrIds.getRows() == null || ehrIds.getRows().isEmpty()) {
             Logger.info("Nothing to delete for templateId {}, originalId {} from system: {}",
-                    templateId, itemId, Settings.getSystemId());
+                    templateId, itemId, systemId);
             return;
         }
 
@@ -43,7 +42,7 @@ public final class OpenEhrUtils {
 
     protected static Map<String, Object> getVersionUid(DefaultRestClient openEhrClient,
             Map<String, MappingAttributes> aqls,
-            String templateId, String itemId) throws ProcessingException {
+            String templateId, String itemId, String systemId) throws ProcessingException {
 
         Map<String, Object> oviMap = new HashMap<>();
 
@@ -53,16 +52,16 @@ public final class OpenEhrUtils {
         }
         QueryResponseData ehrIds = openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(
                 String.format(aqls.get(templateId).getUpdateAql(), templateId,
-                        Settings.getSystemId(), itemId)));
+                        systemId, itemId)));
         if (ehrIds.getRows() == null || ehrIds.getRows().isEmpty()) {
             Logger.info("No composition found for templateId {}, originalId {} from system: {}",
-                    templateId, itemId, Settings.getSystemId());
+                    templateId, itemId, systemId);
             return oviMap;
         }
 
         if (ehrIds.getRows().size() > 1) {
             Logger.warn("Found more than one composition for ID: {} from system: {}!"
-                    + " This should not happen! Deleting all but the latest.", itemId, Settings.getSystemId());
+                    + " This should not happen! Deleting all but the latest.", itemId, systemId);
             for (int i = 1; i < ehrIds.getRows().size(); i++) {
                 List<Object> l = ehrIds.getRows().get(i);
                 UUID ehrId = UUID.fromString((String) l.getFirst());
