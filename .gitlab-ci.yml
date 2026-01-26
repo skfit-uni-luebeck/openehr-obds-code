@@ -2,9 +2,9 @@ build-latest:
   stage: build
   tags:
     - docker
-  image: docker:24.0.7
+  image: docker:24.0.9
   services:
-     - name: docker:24.0.7-dind
+     - name: docker:24.0.9-dind
        alias: docker-dind
   variables:
      DOCKER_TLS_CERTDIR: ""
@@ -31,9 +31,9 @@ build-release:
   stage: build
   tags:
     - docker
-  image: docker:24.0.7
+  image: docker:24.0.9
   services:
-     - name: docker:24.0.7-dind
+     - name: docker:24.0.9-dind
        alias: docker-dind
   variables:
      DOCKER_TLS_CERTDIR: ""
