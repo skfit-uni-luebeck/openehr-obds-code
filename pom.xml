@@ -16,7 +16,7 @@
         <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
         <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
         <coveralls-maven-plugin.version>4.3.0</coveralls-maven-plugin.version>
-        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <exec.mainClass>de.uksh.medic.etl.OpenEhrObds</exec.mainClass>
     </properties>
 
