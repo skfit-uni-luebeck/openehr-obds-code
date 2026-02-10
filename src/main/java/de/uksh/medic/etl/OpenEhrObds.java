@@ -478,7 +478,7 @@ public final class OpenEhrObds {
             }
         } while (ehrId == null);
 
-        String systemId = composition.getFeederAudit().getOriginatingSystemItemIds().getFirst().getId();
+        String systemId = composition.getFeederAudit().getOriginatingSystemAudit().getSystemId();
 
         Map<String, Object> oviMap = OpenEhrUtils.getVersionUid(openEhrClient, AQLS, templateId,
                 ((List<String>) data.get("identifier")).getFirst(), systemId);
