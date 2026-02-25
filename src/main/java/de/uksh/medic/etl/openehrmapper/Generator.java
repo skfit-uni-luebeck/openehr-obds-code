@@ -769,13 +769,24 @@ public class Generator {
             }
             ((Element) jsonmap).setValue(dvq);
         } else {
-            Logger.error("Value " + magnitude + " is not between bounds " + lower + " - " + upper);
+            Logger.error("Value " + magnitude + unit + " is not between bounds " + lower + " - " + upper);
         }
     }
 
     public void gen_DV_COUNT(String path, String name, Object jsonmap,
-            Map<String, Long> map, Map<String, Object> datatypes) {
-        ((Element) jsonmap).setValue(new DvCount(map.get(name)));
+            Map<String, Long> map, Map<String, Object> datatypes) throws Exception {
+
+        Long count = map.get(name);
+
+        Long lower = getBoundsCount(path, "lower");
+        Long upper = getBoundsCount(path, "upper");
+
+        if ((lower == null || lower <= count) && (upper == null || count <= upper)) {
+            ((Element) jsonmap).setValue(new DvCount(count));
+        } else {
+            Logger.error("Value " + count + " is not between bounds " + lower + " - " + upper);
+        }
+
     }
 
     public void gen_DV_PROPORTION(String path, String name, Object jsonmap,
@@ -850,6 +861,16 @@ public class Generator {
             cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         return "".equals(cache.get(newPath)) ? null : Double.valueOf(cache.get(newPath));
+    }
+
+    private Long getBoundsCount(String path, String type) throws Exception {
+        String newPath = path + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/" + type
+                + "/text()";
+        if (!cache.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        return "".equals(cache.get(newPath)) ? null : Long.valueOf(cache.get(newPath));
     }
 
     private Boolean isMandatory(String path) throws Exception {
