@@ -149,7 +149,11 @@ public class Generator {
         String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
-        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+        if (!map.containsKey(paramName)) {
+            return;
+        }
+
+        if (map.get(paramName) instanceof List) {
             l = (List<Map<String, Object>>) map.get(paramName);
         } else {
             l = List.of((Map<String, Object>) map.get(paramName));
@@ -186,7 +190,11 @@ public class Generator {
         String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
-        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+        if (!map.containsKey(paramName)) {
+            return;
+        }
+
+        if (map.get(paramName) instanceof List) {
             l = (List<Map<String, Object>>) map.get(paramName);
         } else {
             l = List.of((Map<String, Object>) map.get(paramName));
@@ -283,7 +291,11 @@ public class Generator {
         String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
-        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+        if (!map.containsKey(paramName)) {
+            return;
+        }
+
+        if (map.get(paramName) instanceof List) {
             l = (List<Map<String, Object>>) map.get(paramName);
         } else {
             l = List.of((Map<String, Object>) map.get(paramName));
@@ -363,7 +375,11 @@ public class Generator {
         String label = getLabel(path, getNodeId(path), paramName);
 
         List<Map<String, Object>> l;
-        if (map.containsKey(paramName) && map.get(paramName) instanceof List) {
+        if (!map.containsKey(paramName)) {
+            return;
+        }
+
+        if (map.get(paramName) instanceof List) {
             l = (List<Map<String, Object>>) map.get(paramName);
         } else {
             l = List.of((Map<String, Object>) map.get(paramName));
