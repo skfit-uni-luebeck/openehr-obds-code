@@ -716,39 +716,60 @@ public class Generator {
 
     @SuppressWarnings({ "MagicNumber" })
     public void gen_DV_QUANTITY(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) {
+            Map<String, Object> map, Map<String, Object> datatypes) throws Exception {
+
+        String unit = null;
+        Double magnitude = null;
+        Long precision = null;
+        String unitDisplayName = null;
 
         switch (map.get(name)) {
             case String s -> {
-                DvQuantity dvq = new DvQuantity("1", Double.valueOf(s), 1L);
-                ((Element) jsonmap).setValue(dvq);
+                unit = "1";
+                magnitude = Double.valueOf(s);
+                precision = 1L;
             }
             case String[] m -> {
-                String magnitude = m[0];
-                if (magnitude == null || magnitude.isBlank()) {
+                String magnitudeS = m[0];
+                if (magnitudeS == null || magnitudeS.isBlank()) {
                     return;
                 }
-                Long precision = -1L;
+                magnitude = Double.valueOf(magnitudeS);
+                precision = -1L;
                 if (m.length == 3) {
                     precision = Long.valueOf(m[2]);
                 }
-                String units = (String) m[1];
-                DvQuantity dvq = new DvQuantity(units, Double.valueOf(magnitude), precision);
-                ((Element) jsonmap).setValue(dvq);
+                unit = (String) m[1];
             }
             case Quantity q -> {
                 if (q.getCode() == null) {
                     q.setCode("1");
                 }
-                DvQuantity dvq = new DvQuantity(q.getCode(), q.getValue().doubleValue(),
-                        Long.valueOf(q.getValue().precision()));
+                unit = q.getCode();
+                magnitude = q.getValue().doubleValue();
+                precision = Long.valueOf(q.getValue().precision());
                 if (q.getUnit() != null) {
-                    dvq.setUnitsDisplayName(q.getUnit());
+                    unitDisplayName = q.getUnit();
                 }
-                ((Element) jsonmap).setValue(dvq);
             }
             default -> {
             }
+        }
+
+        if (magnitude == null) {
+            return;
+        }
+        Double lower = getBounds(path, "lower");
+        Double upper = getBounds(path, "upper");
+
+        if ((lower == null || lower <= magnitude) && (upper == null || magnitude <= upper)) {
+            DvQuantity dvq = new DvQuantity(unit, magnitude, precision);
+            if (unitDisplayName != null) {
+                dvq.setUnitsDisplayName(unitDisplayName);
+            }
+            ((Element) jsonmap).setValue(dvq);
+        } else {
+            Logger.error("Value " + magnitude + " is not between bounds " + lower + " - " + upper);
         }
     }
 
@@ -821,6 +842,15 @@ public class Generator {
     // DV_EHR_URI
 
     // XPath Query functions
+
+    private Double getBounds(String path, String type) throws Exception {
+        String newPath = path + "/list/magnitude/" + type + "/text()";
+        if (!cache.containsKey(newPath)) {
+            XPathExpression expr = XP.compile(newPath);
+            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        return "".equals(cache.get(newPath)) ? null : Double.valueOf(cache.get(newPath));
+    }
 
     private Boolean isMandatory(String path) throws Exception {
         String newPath = path + "/occurrences/lower/text()";
