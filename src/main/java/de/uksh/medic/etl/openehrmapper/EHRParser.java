@@ -16,12 +16,17 @@ import com.nedap.archie.rm.generic.PartyIdentified;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
+import de.uksh.medic.etl.model.Violation;
 import de.uksh.medic.etl.settings.Settings;
 import java.io.IOException;
 import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
@@ -51,7 +56,7 @@ public class EHRParser {
     }
 
     public Composition build(Map<String, Object> map, Map<String, Object> datatypes)
-            throws XPathExpressionException {
+            throws XPathExpressionException, IOException {
 
         String pathContent = "//template/definition[rm_type_name = \"COMPOSITION\"]"
                 + "/attributes[rm_attribute_name=\"content\"]";
@@ -114,9 +119,11 @@ public class EHRParser {
                 ((List<String>) map.getOrDefault("start_time", List.of(LocalDateTime.now().toString()))).get(0));
 
         Map<String, Object> applyMap = g.applyDefaults(map);
+        List<Violation> violations = new ArrayList<>();
         ArrayList<ContentItem> content = new ArrayList<>();
         composition.setContent(content);
-        g.processAttributeChildren(pathContent, composition.getArchetypeNodeId(), content, applyMap, datatypes);
+        g.processAttributeChildren(pathContent, composition.getArchetypeNodeId(), content, applyMap, datatypes,
+                violations);
 
         EventContext context = new EventContext(new DvDateTime((String) map.get("start_time")),
                 new DvCodedText("other care", new CodePhrase(new TerminologyId("openehr"), "238")));
@@ -132,7 +139,18 @@ public class EHRParser {
         composition.setContext(context);
         ItemTree itemTree = new ItemTree();
         context.setOtherContext(itemTree);
-        g.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap, datatypes);
+        g.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap, datatypes,
+                violations);
+
+        Files.write(
+                Paths.get("violations.txt"),
+                (String.join("\r\n",
+                        violations.stream()
+                                .map(s -> templateId.getValue() + ";" + map.get("datalake_id") + ";"
+                                        + String.valueOf(s))
+                                .collect(Collectors.toList()))
+                        + "\r\n").getBytes(),
+                StandardOpenOption.APPEND);
 
         return composition;
 

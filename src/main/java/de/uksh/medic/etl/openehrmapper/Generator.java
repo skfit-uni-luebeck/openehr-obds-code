@@ -37,6 +37,7 @@ import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
 import de.uksh.medic.etl.model.MappingAttributes;
+import de.uksh.medic.etl.model.Violation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Period;
@@ -70,7 +71,7 @@ public class Generator {
     }
 
     public void processAttributeChildren(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) {
         String newPath = path + "/children";
         if (!cacheNodeList.containsKey(newPath + "/rm_type_name")) {
             XPathExpression expr;
@@ -104,8 +105,8 @@ public class Generator {
             Method met;
             try {
                 met = this.getClass().getMethod(type, String.class, String.class, Object.class,
-                        Map.class, Map.class);
-                met.invoke(this, newPath + "[" + (i + 1) + "]", name, jsonmap, map, datatypes);
+                        Map.class, Map.class, List.class);
+                met.invoke(this, newPath + "[" + (i + 1) + "]", name, jsonmap, map, datatypes, violations);
             } catch (NoSuchMethodException | SecurityException | IllegalAccessException | InvocationTargetException e) {
                 Logger.error(e);
             }
@@ -117,7 +118,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_SECTION(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String label = getLabel(path, getNodeId(path), paramName);
@@ -130,7 +131,8 @@ public class Generator {
         List<ContentItem> items = new ArrayList<>();
         processAttributeChildren(newPath, paramName, items,
                 (Map<String, Object>) map.getOrDefault(resolvedPath, map.get(paramName)),
-                (Map<String, Object>) datatypes.getOrDefault(resolvedPath, datatypes.get(paramName)));
+                (Map<String, Object>) datatypes.getOrDefault(resolvedPath, datatypes.get(paramName)),
+                violations);
         section.setItems(items);
 
         ((List<ContentItem>) jsonmap).add(section);
@@ -141,7 +143,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_ADMIN_ENTRY(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -170,7 +172,8 @@ public class Generator {
             adminEntry.setSubject(new PartySelf());
 
             ItemTree itemTree = new ItemTree();
-            processAttributeChildren(oap, paramName, itemTree, le, (Map<String, Object>) map.get(paramName));
+            processAttributeChildren(oap, paramName, itemTree, le, (Map<String, Object>) map.get(paramName),
+                    violations);
             adminEntry.setData(itemTree);
             if (oa) {
                 ((ArrayList<ContentItem>) jsonmap).add(adminEntry);
@@ -180,7 +183,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_OBSERVATION(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -212,13 +215,13 @@ public class Generator {
 
             History<ItemStructure> history = new History<>();
             processAttributeChildren(oap, paramName, history, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             if (history.getEvents().size() > 0) {
                 observation.setData(history);
             }
             ItemTree protocol = new ItemTree();
             processAttributeChildren(oapProtocol, paramName, protocol, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             if (protocol.getItems().size() > 0) {
                 observation.setProtocol(protocol);
             }
@@ -230,7 +233,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_EVALUATION(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"data\"]";
@@ -262,13 +265,13 @@ public class Generator {
 
             ItemTree data = new ItemTree();
             processAttributeChildren(oap, paramName, data, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             if (data.getItems().size() > 0) {
                 evaluation.setData(data);
             }
             ItemTree protocol = new ItemTree();
             processAttributeChildren(oapProtocol, paramName, protocol, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             if (protocol.getItems().size() > 0) {
                 evaluation.setProtocol(protocol);
             }
@@ -281,7 +284,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_INSTRUCTION(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oapActivities = path + "/attributes[rm_attribute_name=\"activities\"]";
@@ -315,9 +318,9 @@ public class Generator {
             List<Activity> activities = new ArrayList<>();
             ItemTree protocol = new ItemTree();
             processAttributeChildren(oapActivities, paramName, activities, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             processAttributeChildren(oapProtocol, paramName, protocol, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             if (activities.size() > 0) {
                 instruction.setActivities(activities);
             }
@@ -332,7 +335,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_ACTIVITY(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String nodeId = getNodeId(path);
         String oap = path + "/attributes[rm_attribute_name=\"description\"]";
@@ -355,7 +358,7 @@ public class Generator {
 
             ItemTree itemTree = new ItemTree();
             processAttributeChildren(oap, name, itemTree, le,
-                    (Map<String, Object>) datatypes.getOrDefault(nodeId, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(nodeId, new HashMap<>()), violations);
             activity.setDescription(itemTree);
             if (oa) {
                 ((ArrayList<Activity>) jsonmap).add(activity);
@@ -365,7 +368,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_ACTION(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String paramName = getArcheTypeId(path);
         String oapDescription = path + "/attributes[rm_attribute_name=\"description\"]";
@@ -401,9 +404,9 @@ public class Generator {
             ItemTree description = new ItemTree();
             ItemTree protocol = new ItemTree();
             processAttributeChildren(oapDescription, paramName, description, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             processAttributeChildren(oapProtocol, paramName, protocol, le,
-                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()));
+                    (Map<String, Object>) datatypes.getOrDefault(paramName, new HashMap<>()), violations);
             if (description.getItems().size() > 0) {
                 action.setDescription(description);
             }
@@ -427,7 +430,7 @@ public class Generator {
     // ITEM_TABLE
 
     public void gen_ITEM_TREE(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         if (!cache.containsKey(path + "/../rm_attribute_name")) {
             XPathExpression expr = XP.compile(path + "/../rm_attribute_name");
@@ -445,7 +448,7 @@ public class Generator {
         itemTree.setNameAsString(getLabel(path, nodeId, name));
         ArrayList<Item> items = new ArrayList<>();
         itemTree.setItems(items);
-        processAttributeChildren(newPath, name, items, map, datatypes);
+        processAttributeChildren(newPath, name, items, map, datatypes, violations);
     }
 
     // Representation Class descriptions
@@ -453,7 +456,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_CLUSTER(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes)
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         if (!cache.containsKey(path + "/archetype_id")) {
             XPathExpression expr = XP.compile(path + "/archetype_id");
@@ -492,7 +495,7 @@ public class Generator {
             Map<String, Object> mam = datatypes.containsKey(usedCode)
                     && datatypes.get(usedCode) instanceof MappingAttributes ? datatypes
                             : (Map<String, Object>) datatypes.getOrDefault(usedCode, new HashMap<>());
-            processAttributeChildren(newPath, paramName, items, le, mam);
+            processAttributeChildren(newPath, paramName, items, le, mam, violations);
             cluster.setItems(items);
             ((ArrayList<Object>) jsonmap).add(cluster);
 
@@ -501,7 +504,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_ELEMENT(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String nodeId = getNodeId(path);
         String newPath = path + "/attributes[rm_attribute_name = \"value\"]";
@@ -530,7 +533,7 @@ public class Generator {
             if (e instanceof Map || e instanceof List) {
                 return;
             }
-            processAttributeChildren(newPath, nodeId, el, mo, datatypes);
+            processAttributeChildren(newPath, nodeId, el, mo, datatypes, violations);
             ((ArrayList<Element>) jsonmap).add(el);
 
         });
@@ -541,7 +544,7 @@ public class Generator {
 
     @SuppressWarnings("unchecked")
     public void gen_HISTORY(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
@@ -562,12 +565,12 @@ public class Generator {
                     new DvDuration((TemporalAmount) Period.between(zdt1.toLocalDate(), zdt2.toLocalDate())));
         }
 
-        processAttributeChildren(newPath, name, history, map, datatypes);
+        processAttributeChildren(newPath, name, history, map, datatypes, violations);
     }
 
     @SuppressWarnings("unchecked")
     public void gen_EVENT(String path, String name, Object jsonmap, Map<String, Object> map,
-            Map<String, Object> datatypes)
+            Map<String, Object> datatypes, List<Violation> violations)
             throws Exception {
         String nodeId = getNodeId(path);
         String label = getTypeLabel(path, nodeId);
@@ -582,7 +585,7 @@ public class Generator {
 
         events.setTime(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
         ItemTree itemTree = new ItemTree();
-        processAttributeChildren(newPath, name, itemTree, map, datatypes);
+        processAttributeChildren(newPath, name, itemTree, map, datatypes, violations);
         events.setData(itemTree);
 
         ((History<ItemStructure>) jsonmap).addEvent(events);
@@ -595,14 +598,14 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions
 
     public void gen_DV_BOOLEAN(String path, String name, Object jsonmap,
-            Map<String, Boolean> map, Map<String, Object> datatypes) {
+            Map<String, Boolean> map, Map<String, Object> datatypes, List<Violation> violations) {
         ((Element) jsonmap).setValue(new DvBoolean(map.get(name)));
     }
 
     // DV_STATE
 
     public void gen_DV_IDENTIFIER(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) {
         DvIdentifier id = new DvIdentifier();
         id.setId(String.valueOf(map.get(name)));
         ((Element) jsonmap).setValue(id);
@@ -612,11 +615,11 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_2
 
     public void gen_DV_TEXT(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) throws Exception {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
         if (!map.containsKey(name)) {
             return;
         } else if (map.get(name) instanceof Coding) {
-            gen_DV_CODED_TEXT(path, name, jsonmap, map, datatypes);
+            gen_DV_CODED_TEXT(path, name, jsonmap, map, datatypes, violations);
         } else {
             ((Element) jsonmap).setValue(new DvText((String) map.get(name)));
         }
@@ -627,7 +630,7 @@ public class Generator {
     // CODE_PHRASE
 
     public void gen_DV_CODED_TEXT(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) throws Exception {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
 
         DvCodedText ct = new DvCodedText();
         switch (map.get(name)) {
@@ -684,7 +687,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_3
 
     public void gen_DV_INTERVAL(String path, String name, Object jsonmap,
-            Map<String, String> map, Map<String, Object> datatypes) throws Exception {
+            Map<String, String> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
         String[] intervals = map.get(name).split(" - ");
         if (intervals.length != 2) {
             return;
@@ -698,7 +701,7 @@ public class Generator {
     // REFERENCE_RANGE
 
     public void gen_DV_ORDINAL(String path, String name, Object jsonmap,
-            Map<String, String> map, Map<String, Object> datatypes) throws Exception {
+            Map<String, String> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
         DvOrdinal dvo = new DvOrdinal();
         Long value = Long.valueOf(map.get(name));
         dvo.setValue(value);
@@ -716,7 +719,7 @@ public class Generator {
 
     @SuppressWarnings({ "MagicNumber" })
     public void gen_DV_QUANTITY(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) throws Exception {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
 
         String unit = null;
         Double magnitude = null;
@@ -769,12 +772,13 @@ public class Generator {
             }
             ((Element) jsonmap).setValue(dvq);
         } else {
+            violations.add(new Violation(magnitude, lower, upper, unit));
             Logger.error("Value " + magnitude + unit + " is not between bounds " + lower + " - " + upper);
         }
     }
 
     public void gen_DV_COUNT(String path, String name, Object jsonmap,
-            Map<String, Long> map, Map<String, Object> datatypes) throws Exception {
+            Map<String, Long> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
 
         Long count = map.get(name);
 
@@ -784,13 +788,14 @@ public class Generator {
         if ((lower == null || lower <= count) && (upper == null || count <= upper)) {
             ((Element) jsonmap).setValue(new DvCount(count));
         } else {
+            violations.add(new Violation(count, lower, upper));
             Logger.error("Value " + count + " is not between bounds " + lower + " - " + upper);
         }
 
     }
 
     public void gen_DV_PROPORTION(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) {
         switch (map.get(name)) {
             case String[] s -> {
                 DvProportion dvp = new DvProportion(Double.valueOf(s[0]), Double.valueOf(s[1]), Long.valueOf(s[2]));
@@ -809,22 +814,22 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_4
 
     public void gen_DV_DATE(String path, String name, Object jsonmap,
-            Map<String, String> map, Map<String, Object> datatypes) {
+            Map<String, String> map, Map<String, Object> datatypes, List<Violation> violations) {
         ((Element) jsonmap).setValue(new DvDate(map.get(name)));
     }
 
     public void gen_DV_TIME(String path, String name, Object jsonmap,
-            Map<String, String> map, Map<String, Object> datatypes) {
+            Map<String, String> map, Map<String, Object> datatypes, List<Violation> violations) {
         ((Element) jsonmap).setValue(new DvTime(map.get(name)));
     }
 
     public void gen_DV_DATE_TIME(String path, String name, Object jsonmap,
-            Map<String, String> map, Map<String, Object> datatypes) {
+            Map<String, String> map, Map<String, Object> datatypes, List<Violation> violations) {
         ((Element) jsonmap).setValue(new DvDateTime(map.get(name)));
     }
 
     public void gen_DV_DURATION(String path, String name, Object jsonmap,
-            Map<String, String> map, Map<String, Object> datatypes) {
+            Map<String, String> map, Map<String, Object> datatypes, List<Violation> violations) {
         ((Element) jsonmap).setValue(new DvDuration(map.get(name)));
     }
 
@@ -846,7 +851,7 @@ public class Generator {
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_7
 
     public void gen_DV_URI(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes) {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) {
         ((Element) jsonmap).setValue(new DvURI(String.valueOf(map.get(name))));
     }
 

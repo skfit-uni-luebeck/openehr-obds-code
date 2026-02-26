@@ -131,8 +131,11 @@ public final class OpenEhrObds {
                 if (f.isDirectory()) {
                     continue;
                 }
-                walkTree(mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
-                }).entrySet(), 1, "", new LinkedHashMap<>());
+                Map<String, Object> entries = mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
+                });
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("datalake_id", entries.get("datalake_id"));
+                walkTree(entries.entrySet(), 1, "", map);
                 SPEED.put(UUID.randomUUID().toString(), "success");
             }
             System.exit(0);
@@ -166,10 +169,12 @@ public final class OpenEhrObds {
                     for (ConsumerRecord<String, String> record : records) {
                         Logger.debug("Processing record.");
                         try {
-                            walkTree(mapper.readValue(record.value(),
+                            Map<String, Object> entries = mapper.readValue(record.value(),
                                     new TypeReference<LinkedHashMap<String, Object>>() {
-                                    }).entrySet(), 1, "",
-                                    new LinkedHashMap<>());
+                                    });
+                            Map<String, Object> map = new LinkedHashMap<>();
+                            map.put("datalake_id", entries.get("datalake_id"));
+                            walkTree(entries.entrySet(), 1, "", map);
                         } catch (ProcessingException e) {
                             Logger.error("ProcessingException occured, writing to error topic!");
                             producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
@@ -415,7 +420,7 @@ public final class OpenEhrObds {
             composition = PARSERS.get(templateId).build(data,
                     (Map<String, Object>) openehrDatatypes.getOrDefault(templateId, new HashMap<>()));
 
-        } catch (XPathExpressionException e) {
+        } catch (XPathExpressionException | IOException e) {
             Logger.error(e);
             throw new ProcessingException(e);
         }

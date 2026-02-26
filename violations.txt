@@ -1,0 +1,1 @@
+template;datalake_id;value;lower;upper;unit
