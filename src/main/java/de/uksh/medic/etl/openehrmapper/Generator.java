@@ -762,18 +762,13 @@ public class Generator {
         if (magnitude == null) {
             return;
         }
-        Double lower = getBounds(path, "lower");
-        Double upper = getBounds(path, "upper");
 
-        if ((lower == null || lower <= magnitude) && (upper == null || magnitude <= upper)) {
+        if (isInBounds(path, unit, magnitude, violations)) {
             DvQuantity dvq = new DvQuantity(unit, magnitude, precision);
             if (unitDisplayName != null) {
                 dvq.setUnitsDisplayName(unitDisplayName);
             }
             ((Element) jsonmap).setValue(dvq);
-        } else {
-            violations.add(new Violation(magnitude, lower, upper, unit));
-            Logger.error("Value " + magnitude + unit + " is not between bounds " + lower + " - " + upper);
         }
     }
 
@@ -782,24 +777,20 @@ public class Generator {
 
         Long count = map.get(name);
 
-        Long lower = getBoundsCount(path, "lower");
-        Long upper = getBoundsCount(path, "upper");
-
-        if ((lower == null || lower <= count) && (upper == null || count <= upper)) {
+        if (isInBoundsCount(path, count, violations)) {
             ((Element) jsonmap).setValue(new DvCount(count));
-        } else {
-            violations.add(new Violation(count, lower, upper));
-            Logger.error("Value " + count + " is not between bounds " + lower + " - " + upper);
         }
 
     }
 
     public void gen_DV_PROPORTION(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) {
+            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
         switch (map.get(name)) {
             case String[] s -> {
-                DvProportion dvp = new DvProportion(Double.valueOf(s[0]), Double.valueOf(s[1]), Long.valueOf(s[2]));
-                ((Element) jsonmap).setValue(dvp);
+                if (isInBoundsProportion(path, Double.valueOf(s[0]), violations)) {
+                    DvProportion dvp = new DvProportion(Double.valueOf(s[0]), Double.valueOf(s[1]), Long.valueOf(s[2]));
+                    ((Element) jsonmap).setValue(dvp);
+                }
             }
             default -> {
             }
@@ -859,23 +850,201 @@ public class Generator {
 
     // XPath Query functions
 
-    private Double getBounds(String path, String type) throws Exception {
-        String newPath = path + "/list/magnitude/" + type + "/text()";
-        if (!cache.containsKey(newPath)) {
-            XPathExpression expr = XP.compile(newPath);
-            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+    private boolean isInBounds(String path, String unit, Double magnitude, List<Violation> violations)
+            throws Exception {
+        String lowerPathValue = path + "/list[units=\"" + unit + "\"]/magnitude/lower/text()";
+        String lowerPathInclude = path + "/list[units=\"" + unit + "\"]/magnitude/lower_included/text()";
+        String lowerPathUnbound = path + "/list[units=\"" + unit + "\"]/magnitude/lower_unbounded/text()";
+        String upperPathValue = path + "/list[units=\"" + unit + "\"]/magnitude/upper/text()";
+        String upperPathInclude = path + "/list[units=\"" + unit + "\"]/magnitude/upper_included/text()";
+        String upperPathUnbound = path + "/list[units=\"" + unit + "\"]/magnitude/upper_unbounded/text()";
+        if (!cache.containsKey(lowerPathValue)) {
+            XPathExpression expr = XP.compile(lowerPathValue);
+            cache.put(lowerPathValue, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return "".equals(cache.get(newPath)) ? null : Double.valueOf(cache.get(newPath));
+        if (!cache.containsKey(lowerPathInclude)) {
+            XPathExpression expr = XP.compile(lowerPathInclude);
+            cache.put(lowerPathInclude, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(lowerPathUnbound)) {
+            XPathExpression expr = XP.compile(lowerPathUnbound);
+            cache.put(lowerPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathValue)) {
+            XPathExpression expr = XP.compile(upperPathValue);
+            cache.put(upperPathValue, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathInclude)) {
+            XPathExpression expr = XP.compile(upperPathInclude);
+            cache.put(upperPathInclude, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathUnbound)) {
+            XPathExpression expr = XP.compile(upperPathUnbound);
+            cache.put(upperPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        Double lowerValue = "".equals(cache.get(lowerPathValue)) ? null : Double.valueOf(cache.get(lowerPathValue));
+        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? null
+                : Boolean.parseBoolean(cache.get(lowerPathInclude));
+        boolean lowerUnbound = "".equals(cache.get(lowerPathUnbound)) ? true
+                : Boolean.parseBoolean(cache.get(lowerPathUnbound));
+
+        Double upperValue = "".equals(cache.get(upperPathValue)) ? null : Double.valueOf(cache.get(upperPathValue));
+        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? null
+                : Boolean.parseBoolean(cache.get(upperPathInclude));
+        boolean upperUnbound = "".equals(cache.get(upperPathUnbound)) ? true
+                : Boolean.parseBoolean(cache.get(upperPathUnbound));
+
+        boolean lower = lowerUnbound || lowerValue == null
+                || (lowerInclude ? lowerValue <= magnitude : lowerValue < magnitude);
+
+        boolean upper = upperUnbound || upperValue == null
+                || (upperInclude ? magnitude <= upperValue : magnitude < upperValue);
+
+        if (!lower || !upper) {
+            violations.add(new Violation(magnitude, lower, upper, unit));
+            String lowerSign = lowerInclude ? "[" : "(";
+            String upperSign = upperInclude ? "]" : ")";
+            Logger.error("Value " + magnitude + unit + " is not between bounds " + lowerSign + lowerValue + " - "
+                    + upperValue + upperSign);
+        }
+
+        return lower && upper;
+
     }
 
-    private Long getBoundsCount(String path, String type) throws Exception {
-        String newPath = path + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/" + type
-                + "/text()";
-        if (!cache.containsKey(newPath)) {
-            XPathExpression expr = XP.compile(newPath);
-            cache.put(newPath, (String) expr.evaluate(opt, XPathConstants.STRING));
+    private boolean isInBoundsCount(String path, Long count, List<Violation> violations) throws Exception {
+        String lowerPathValue = path
+                + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/lower/text()";
+        String lowerPathInclude = path
+                + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/lower_included/text()";
+        String lowerPathUnbound = path
+                + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/lower_unbounded/text()";
+        String upperPathValue = path
+                + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/upper/text()";
+        String upperPathInclude = path
+                + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/upper_included/text()";
+        String upperPathUnbound = path
+                + "/attributes[rm_attribute_name = \"magnitude\"]/children/item/range/upper_unbounded/text()";
+        if (!cache.containsKey(lowerPathValue)) {
+            XPathExpression expr = XP.compile(lowerPathValue);
+            cache.put(lowerPathValue, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
-        return "".equals(cache.get(newPath)) ? null : Long.valueOf(cache.get(newPath));
+        if (!cache.containsKey(lowerPathInclude)) {
+            XPathExpression expr = XP.compile(lowerPathInclude);
+            cache.put(lowerPathInclude, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(lowerPathUnbound)) {
+            XPathExpression expr = XP.compile(lowerPathUnbound);
+            cache.put(lowerPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathValue)) {
+            XPathExpression expr = XP.compile(upperPathValue);
+            cache.put(upperPathValue, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathInclude)) {
+            XPathExpression expr = XP.compile(upperPathInclude);
+            cache.put(upperPathInclude, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathUnbound)) {
+            XPathExpression expr = XP.compile(upperPathUnbound);
+            cache.put(upperPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        Long lowerValue = "".equals(cache.get(lowerPathValue)) ? null : Long.valueOf(cache.get(lowerPathValue));
+        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? null
+                : Boolean.parseBoolean(cache.get(lowerPathInclude));
+        boolean lowerUnbound = "".equals(cache.get(lowerPathUnbound)) ? true
+                : Boolean.parseBoolean(cache.get(lowerPathUnbound));
+
+        Long upperValue = "".equals(cache.get(upperPathValue)) ? null : Long.valueOf(cache.get(upperPathValue));
+        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? null
+                : Boolean.parseBoolean(cache.get(upperPathInclude));
+        boolean upperUnbound = "".equals(cache.get(upperPathUnbound)) ? true
+                : Boolean.parseBoolean(cache.get(upperPathUnbound));
+
+        boolean lower = lowerUnbound || lowerValue == null
+                || (lowerInclude ? lowerValue <= count : lowerValue < count);
+
+        boolean upper = upperUnbound || upperValue == null
+                || (upperInclude ? count <= upperValue : count < upperValue);
+
+        if (!lower || !upper) {
+            violations.add(new Violation(count, lower, upper));
+            String lowerSign = lowerInclude ? "[" : "(";
+            String upperSign = upperInclude ? "]" : ")";
+            Logger.error("Value " + count + " is not between bounds " + lowerSign + lowerValue + " - " + upperValue
+                    + upperSign);
+        }
+
+        return lower && upper;
+
+    }
+
+    private boolean isInBoundsProportion(String path, Double numerator, List<Violation> violations) throws Exception {
+        String lowerPathValue = path
+                + "/attributes[rm_attribute_name = \"numerator\"]/children/item/range/lower/text()";
+        String lowerPathInclude = path
+                + "/attributes[rm_attribute_name = \"numerator\"]/children/item/range/lower_included/text()";
+        String lowerPathUnbound = path
+                + "/attributes[rm_attribute_name = \"numerator\"]/children/item/range/lower_unbounded/text()";
+        String upperPathValue = path
+                + "/attributes[rm_attribute_name = \"numerator\"]/children/item/range/upper/text()";
+        String upperPathInclude = path
+                + "/attributes[rm_attribute_name = \"numerator\"]/children/item/range/upper_included/text()";
+        String upperPathUnbound = path
+                + "/attributes[rm_attribute_name = \"numerator\"]/children/item/range/upper_unbounded/text()";
+        if (!cache.containsKey(lowerPathValue)) {
+            XPathExpression expr = XP.compile(lowerPathValue);
+            cache.put(lowerPathValue, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(lowerPathInclude)) {
+            XPathExpression expr = XP.compile(lowerPathInclude);
+            cache.put(lowerPathInclude, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(lowerPathUnbound)) {
+            XPathExpression expr = XP.compile(lowerPathUnbound);
+            cache.put(lowerPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathValue)) {
+            XPathExpression expr = XP.compile(upperPathValue);
+            cache.put(upperPathValue, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathInclude)) {
+            XPathExpression expr = XP.compile(upperPathInclude);
+            cache.put(upperPathInclude, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        if (!cache.containsKey(upperPathUnbound)) {
+            XPathExpression expr = XP.compile(upperPathUnbound);
+            cache.put(upperPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
+        }
+        Double lowerValue = "".equals(cache.get(lowerPathValue)) ? null : Double.valueOf(cache.get(lowerPathValue));
+        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? null
+                : Boolean.parseBoolean(cache.get(lowerPathInclude));
+        boolean lowerUnbound = "".equals(cache.get(lowerPathUnbound)) ? true
+                : Boolean.parseBoolean(cache.get(lowerPathUnbound));
+
+        Double upperValue = "".equals(cache.get(upperPathValue)) ? null : Double.valueOf(cache.get(upperPathValue));
+        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? null
+                : Boolean.parseBoolean(cache.get(upperPathInclude));
+        boolean upperUnbound = "".equals(cache.get(upperPathUnbound)) ? true
+                : Boolean.parseBoolean(cache.get(upperPathUnbound));
+
+        boolean lower = lowerUnbound || lowerValue == null
+                || (lowerInclude ? lowerValue <= numerator : lowerValue < numerator);
+
+        boolean upper = upperUnbound || upperValue == null
+                || (upperInclude ? numerator <= upperValue : numerator < upperValue);
+
+        if (!lower || !upper) {
+            violations.add(new Violation(numerator, lower, upper));
+            String lowerSign = lowerInclude ? "[" : "(";
+            String upperSign = upperInclude ? "]" : ")";
+            Logger.error("Value numerator " + numerator + " is not between bounds " + lowerSign + lowerValue + " - "
+                    + upperValue
+                    + upperSign);
+        }
+
+        return lower && upper;
+
     }
 
     private Boolean isMandatory(String path) throws Exception {
