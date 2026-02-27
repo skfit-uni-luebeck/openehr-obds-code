@@ -142,15 +142,17 @@ public class EHRParser {
         g.processAttributeChildren(pathContext, composition.getArchetypeNodeId(), itemTree, applyMap, datatypes,
                 violations);
 
-        Files.write(
-                Paths.get("violations.txt"),
-                (String.join("\r\n",
-                        violations.stream()
-                                .map(s -> templateId.getValue() + ";" + map.get("datalake_id") + ";"
-                                        + String.valueOf(s))
-                                .collect(Collectors.toList()))
-                        + "\r\n").getBytes(),
-                StandardOpenOption.APPEND);
+        if (!violations.isEmpty()) {
+            Files.write(
+                    Paths.get("violations.txt"),
+                    (String.join("\r\n",
+                            violations.stream()
+                                    .map(s -> templateId.getValue() + ";" + map.get("datalake_id") + ";"
+                                            + String.valueOf(s))
+                                    .collect(Collectors.toList()))
+                            + "\r\n").getBytes(),
+                    StandardOpenOption.APPEND);
+        }
 
         return composition;
 
