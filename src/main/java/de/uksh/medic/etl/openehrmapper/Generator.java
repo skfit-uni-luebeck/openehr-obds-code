@@ -901,7 +901,7 @@ public class Generator {
                 || (upperInclude ? magnitude <= upperValue : magnitude < upperValue);
 
         if (!lower || !upper) {
-            violations.add(new Violation(magnitude, lower, upper, unit));
+            violations.add(new Violation(magnitude, lowerValue, upperValue, unit));
             String lowerSign = lowerInclude ? "[" : "(";
             String upperSign = upperInclude ? "]" : ")";
             Logger.error("Value " + magnitude + unit + " is not between bounds " + lowerSign + lowerValue + " - "
@@ -968,7 +968,7 @@ public class Generator {
                 || (upperInclude ? count <= upperValue : count < upperValue);
 
         if (!lower || !upper) {
-            violations.add(new Violation(count, lower, upper));
+            violations.add(new Violation(count, lowerValue, upperValue));
             String lowerSign = lowerInclude ? "[" : "(";
             String upperSign = upperInclude ? "]" : ")";
             Logger.error("Value " + count + " is not between bounds " + lowerSign + lowerValue + " - " + upperValue
@@ -1035,7 +1035,7 @@ public class Generator {
                 || (upperInclude ? numerator <= upperValue : numerator < upperValue);
 
         if (!lower || !upper) {
-            violations.add(new Violation(numerator, lower, upper));
+            violations.add(new Violation(numerator, lowerValue, upperValue));
             String lowerSign = lowerInclude ? "[" : "(";
             String upperSign = upperInclude ? "]" : ")";
             Logger.error("Value numerator " + numerator + " is not between bounds " + lowerSign + lowerValue + " - "
