@@ -267,7 +267,7 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings({ "unchecked", "IllegalCatch" })
-    public static Map<String, Object> localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path) {
+    public static Object localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path) {
         Binding b = new Binding();
         GroovyShell s = new GroovyShell(b);
         b.setVariable("xmlSet", xmlSet);
@@ -283,7 +283,7 @@ public final class OpenEhrObds {
             try {
                 File groovyFile = new File("scripts", templateId + ".groovy");
                 if (groovyFile.exists()) {
-                    return (Map<String, Object>) s.evaluate(groovyFile);
+                    return s.evaluate(groovyFile);
                 }
             } catch (Exception e) {
                 throw new ProcessingException(e);
@@ -294,7 +294,7 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings({ "HiddenField" })
-    public static Map<String, Object> javaMap(Set<Entry<String, Object>> xmlSet, String path, IGenericClient fhirClient,
+    public static Object javaMap(Set<Entry<String, Object>> xmlSet, String path, IGenericClient fhirClient,
             FhirResolver fhirResolver, DefaultRestClient openEhrClient, UtilMethods utils) {
         return null;
     }
@@ -321,45 +321,51 @@ public final class OpenEhrObds {
                 boolean global = m.getGlobal();
                 boolean update = m.isUpdate();
 
-                Map<String, Object> mapped = localMap(xmlSet, m.getTemplateId(), path);
-                if (mapped == null) {
-                    continue;
-                }
-                if (Settings.getCxxmdr() != null) {
-                    mapped.putAll(convertMdr(xmlSet, m));
-                }
-                mapped.values().removeIf(Objects::isNull);
-                Utils.listConv(mapped);
-                if (Settings.getCxxmdr() != null) {
-                    mapped.entrySet().forEach(e -> FhirUtils.queryFhirTs(FHIR_ATTRIBUTES, m, e, fr));
-                }
-                mapped.values().removeIf(Objects::isNull);
-                Map<String, Object> result = Utils.formatMap(mapped);
+                List<Object> mappedList = switch(localMap(xmlSet, m.getTemplateId(), path)) {
+                    case List l -> l;
+                    case Map ml -> List.of(ml);
+                    default -> new ArrayList<>();
+                };
 
-                boolean done = ((List<Boolean>) result.getOrDefault("done", List.of(true))).get(0);
+                for (Object mappedEntry : mappedList) {
+                    Map<String, Object> mapped = (Map<String, Object>) mappedEntry;
 
-                if (global || !done) {
-                    Generator.deepMergeNoReplace(resMap, result);
-                    theMap = resMap;
-                } else {
-                    Generator.deepMergeNoReplace(result, resMap);
-                    theMap = result;
-                }
+                    if (Settings.getCxxmdr() != null) {
+                        mapped.putAll(convertMdr(xmlSet, m));
+                    }
+                    mapped.values().removeIf(Objects::isNull);
+                    Utils.listConv(mapped);
+                    if (Settings.getCxxmdr() != null) {
+                        mapped.entrySet().forEach(e -> FhirUtils.queryFhirTs(FHIR_ATTRIBUTES, m, e, fr));
+                    }
+                    mapped.values().removeIf(Objects::isNull);
+                    Map<String, Object> result = Utils.formatMap(mapped);
 
-                if (update && result.containsKey("delete")
-                        && Boolean.TRUE.equals(((List<Boolean>) result.get("delete")).getFirst())) {
-                    Logger.info("Found DELETE entry, trying to delete composition...");
-                    String systemId = result.containsKey("systemId")
-                            ? ((List<String>) result.get("systemId")).getFirst()
-                            : Settings.getSystemId();
-                    OpenEhrUtils.deleteOpenEhrComposition(openEhrClient, AQLS, m.getTemplateId(),
-                            ((List<String>) result.get("identifier")).getFirst(), systemId);
-                    return;
-                }
+                    boolean done = ((List<Boolean>) result.getOrDefault("done", List.of(true))).get(0);
 
-                if (split && done) {
-                    Logger.info("Building composition.");
-                    buildOpenEhrComposition(m.getTemplateId(), theMap);
+                    if (global || !done) {
+                        Generator.deepMergeNoReplace(resMap, result);
+                        theMap = resMap;
+                    } else {
+                        Generator.deepMergeNoReplace(result, resMap);
+                        theMap = result;
+                    }
+
+                    if (update && result.containsKey("delete")
+                            && Boolean.TRUE.equals(((List<Boolean>) result.get("delete")).getFirst())) {
+                        Logger.info("Found DELETE entry, trying to delete composition...");
+                        String systemId = result.containsKey("systemId")
+                                ? ((List<String>) result.get("systemId")).getFirst()
+                                : Settings.getSystemId();
+                        OpenEhrUtils.deleteOpenEhrComposition(openEhrClient, AQLS, m.getTemplateId(),
+                                ((List<String>) result.get("identifier")).getFirst(), systemId);
+                        return;
+                    }
+
+                    if (split && done) {
+                        Logger.info("Building composition.");
+                        buildOpenEhrComposition(m.getTemplateId(), theMap);
+                    }
                 }
 
             }
