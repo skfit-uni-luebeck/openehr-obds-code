@@ -376,12 +376,26 @@ public final class OpenEhrObds {
 
             switch (entry.getValue()) {
                 case @SuppressWarnings("rawtypes") Map h -> {
-                    walkTree(h.entrySet(), newDepth, newPath, theMap);
+                    if (Settings.getMapping().getOrDefault(newPath, new ArrayList<>()).size() == 1
+                            && Settings.getMapping().get(newPath).get(0).isList()) {
+                        Map<String, Object> tmpList = new HashMap<>();
+                        tmpList.put("list", List.of(h));
+                        walkTree(tmpList.entrySet(), newDepth, newPath, theMap);
+                    } else {
+                        walkTree(h.entrySet(), newDepth, newPath, theMap);
+                    }
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
-                    for (Object b : a) {
-                        if (b instanceof Map) {
-                            walkTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
+                    if (Settings.getMapping().get(newPath).size() == 1
+                            && Settings.getMapping().get(newPath).get(0).isList()) {
+                        Map<String, Object> tmpList = new HashMap<>();
+                        tmpList.put("list", a);
+                        walkTree(tmpList.entrySet(), newDepth, newPath, theMap);
+                    } else {
+                        for (Object b : a) {
+                            if (b instanceof Map) {
+                                walkTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
+                            }
                         }
                     }
                 }

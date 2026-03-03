@@ -13,6 +13,7 @@ public class Mapping {
     private boolean global;
     private String templateId;
     private boolean update;
+    private boolean list;
 
     public String getSource() {
         return source;
@@ -76,5 +77,13 @@ public class Mapping {
 
     public void setUpdate(boolean update) {
         this.update = update;
+    }
+
+    public boolean isList() {
+        return list;
+    }
+
+    public void setList(boolean list) {
+        this.list = list;
     }
 }
