@@ -883,13 +883,13 @@ public class Generator {
             cache.put(upperPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         Double lowerValue = "".equals(cache.get(lowerPathValue)) ? null : Double.valueOf(cache.get(lowerPathValue));
-        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? null
+        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? false
                 : Boolean.parseBoolean(cache.get(lowerPathInclude));
         boolean lowerUnbound = "".equals(cache.get(lowerPathUnbound)) ? true
                 : Boolean.parseBoolean(cache.get(lowerPathUnbound));
 
         Double upperValue = "".equals(cache.get(upperPathValue)) ? null : Double.valueOf(cache.get(upperPathValue));
-        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? null
+        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? false
                 : Boolean.parseBoolean(cache.get(upperPathInclude));
         boolean upperUnbound = "".equals(cache.get(upperPathUnbound)) ? true
                 : Boolean.parseBoolean(cache.get(upperPathUnbound));
@@ -950,13 +950,13 @@ public class Generator {
             cache.put(upperPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         Long lowerValue = "".equals(cache.get(lowerPathValue)) ? null : Long.valueOf(cache.get(lowerPathValue));
-        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? null
+        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? false
                 : Boolean.parseBoolean(cache.get(lowerPathInclude));
         boolean lowerUnbound = "".equals(cache.get(lowerPathUnbound)) ? true
                 : Boolean.parseBoolean(cache.get(lowerPathUnbound));
 
         Long upperValue = "".equals(cache.get(upperPathValue)) ? null : Long.valueOf(cache.get(upperPathValue));
-        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? null
+        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? false
                 : Boolean.parseBoolean(cache.get(upperPathInclude));
         boolean upperUnbound = "".equals(cache.get(upperPathUnbound)) ? true
                 : Boolean.parseBoolean(cache.get(upperPathUnbound));
@@ -1017,13 +1017,13 @@ public class Generator {
             cache.put(upperPathUnbound, (String) expr.evaluate(opt, XPathConstants.STRING));
         }
         Double lowerValue = "".equals(cache.get(lowerPathValue)) ? null : Double.valueOf(cache.get(lowerPathValue));
-        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? null
+        boolean lowerInclude = "".equals(cache.get(lowerPathInclude)) ? false
                 : Boolean.parseBoolean(cache.get(lowerPathInclude));
         boolean lowerUnbound = "".equals(cache.get(lowerPathUnbound)) ? true
                 : Boolean.parseBoolean(cache.get(lowerPathUnbound));
 
         Double upperValue = "".equals(cache.get(upperPathValue)) ? null : Double.valueOf(cache.get(upperPathValue));
-        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? null
+        boolean upperInclude = "".equals(cache.get(upperPathInclude)) ? false
                 : Boolean.parseBoolean(cache.get(upperPathInclude));
         boolean upperUnbound = "".equals(cache.get(upperPathUnbound)) ? true
                 : Boolean.parseBoolean(cache.get(upperPathUnbound));
