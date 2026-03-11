@@ -321,7 +321,7 @@ public final class OpenEhrObds {
                 boolean global = m.getGlobal();
                 boolean update = m.isUpdate();
 
-                List<Object> mappedList = switch(localMap(xmlSet, m.getTemplateId(), path)) {
+                List<Object> mappedList = switch (localMap(xmlSet, m.getTemplateId(), path)) {
                     case List l -> l;
                     case Map ml -> List.of(ml);
                     default -> new ArrayList<>();
@@ -382,7 +382,8 @@ public final class OpenEhrObds {
 
             switch (entry.getValue()) {
                 case @SuppressWarnings("rawtypes") Map h -> {
-                    if (Settings.getMapping().getOrDefault(newPath, new ArrayList<>()).size() == 1
+                    if (Settings.getMapping().containsKey(newPath)
+                            && Settings.getMapping().getOrDefault(newPath, new ArrayList<>()).size() == 1
                             && Settings.getMapping().get(newPath).get(0).isList()) {
                         Map<String, Object> tmpList = new HashMap<>();
                         tmpList.put("list", List.of(h));
@@ -392,7 +393,7 @@ public final class OpenEhrObds {
                     }
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
-                    if (Settings.getMapping().get(newPath).size() == 1
+                    if (Settings.getMapping().containsKey(newPath) && Settings.getMapping().get(newPath).size() == 1
                             && Settings.getMapping().get(newPath).get(0).isList()) {
                         Map<String, Object> tmpList = new HashMap<>();
                         tmpList.put("list", a);
