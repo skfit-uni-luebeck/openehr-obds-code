@@ -126,7 +126,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testData/prozedur/fail").listFiles();
+            File[] files = new File("testData/zvd").listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
                     continue;
@@ -324,6 +324,7 @@ public final class OpenEhrObds {
                 List<Object> mappedList = switch (localMap(xmlSet, m.getTemplateId(), path)) {
                     case List l -> l;
                     case Map ml -> List.of(ml);
+                    case null -> new ArrayList<>();
                     default -> new ArrayList<>();
                 };
 
