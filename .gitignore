@@ -43,3 +43,4 @@ testInput/*
 scripts/*.groovy
 templates/*.opt
 fileOutput/*
+*.log
