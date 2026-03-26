@@ -27,6 +27,7 @@ public final class Settings {
     private static boolean dev;
     private static String namespace;
     private static int cacheSize;
+    private static String testDataDir;
 
     private Settings() {}
 
@@ -154,6 +155,15 @@ public final class Settings {
     @JsonProperty("cacheSize")
     public void setCacheSize(int newCacheSize) {
         cacheSize = newCacheSize;
+    }
+
+    public static String getTestDataDir() {
+        return testDataDir;
+    }
+
+    @JsonProperty("testDataDir")
+    public void setTestDataDir(String newTestDataDir) {
+        testDataDir = newTestDataDir;
     }
 
 }

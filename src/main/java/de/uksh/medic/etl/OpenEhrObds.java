@@ -126,7 +126,7 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            File[] files = new File("testData/zvd").listFiles();
+            File[] files = new File(Settings.getTestDataDir()).listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
                     continue;
@@ -134,8 +134,9 @@ public final class OpenEhrObds {
                 Map<String, Object> entries = mapper.readValue(f, new TypeReference<LinkedHashMap<String, Object>>() {
                 });
                 Map<String, Object> map = new LinkedHashMap<>();
+                Map<String, Object> cache = new LinkedHashMap<>();
                 map.put("datalake_id", entries.get("datalake_id"));
-                walkTree(entries.entrySet(), 1, "", map);
+                walkTree(entries.entrySet(), 1, "", map, cache);
                 SPEED.put(UUID.randomUUID().toString(), "success");
             }
             System.exit(0);
@@ -173,8 +174,9 @@ public final class OpenEhrObds {
                                     new TypeReference<LinkedHashMap<String, Object>>() {
                                     });
                             Map<String, Object> map = new LinkedHashMap<>();
+                            Map<String, Object> cache = new LinkedHashMap<>();
                             map.put("datalake_id", entries.get("datalake_id"));
-                            walkTree(entries.entrySet(), 1, "", map);
+                            walkTree(entries.entrySet(), 1, "", map, cache);
                         } catch (ProcessingException e) {
                             Logger.error("ProcessingException occured, writing to error topic!");
                             producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
@@ -267,7 +269,8 @@ public final class OpenEhrObds {
     }
 
     @SuppressWarnings({ "unchecked", "IllegalCatch" })
-    public static Object localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path) {
+    public static Object localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path,
+            Map<String, Object> cache) {
         Binding b = new Binding();
         GroovyShell s = new GroovyShell(b);
         b.setVariable("xmlSet", xmlSet);
@@ -276,9 +279,10 @@ public final class OpenEhrObds {
         b.setVariable("fhirResolver", fr);
         b.setVariable("openEhrClient", openEhrClient);
         b.setVariable("utils", um);
+        b.setVariable("cache", cache);
 
         if (Settings.getDev()) {
-            return javaMap(xmlSet, path, fc, fr, openEhrClient, um);
+            return javaMap(xmlSet, path, fc, fr, openEhrClient, um, cache);
         } else {
             try {
                 File groovyFile = new File("scripts", templateId + ".groovy");
@@ -295,13 +299,13 @@ public final class OpenEhrObds {
 
     @SuppressWarnings({ "HiddenField" })
     public static Object javaMap(Set<Entry<String, Object>> xmlSet, String path, IGenericClient fhirClient,
-            FhirResolver fhirResolver, DefaultRestClient openEhrClient, UtilMethods utils) {
+            FhirResolver fhirResolver, DefaultRestClient openEhrClient, UtilMethods utils, Map<String, Object> cache) {
         return null;
     }
 
     @SuppressWarnings({ "unchecked" })
     public static void walkTree(Set<Entry<String, Object>> xmlSet, int depth, String path,
-            Map<String, Object> resMap) {
+            Map<String, Object> resMap, Map<String, Object> cache) {
         if (depth > Settings.getDepthLimit()) {
             return;
         }
@@ -321,7 +325,7 @@ public final class OpenEhrObds {
                 boolean global = m.getGlobal();
                 boolean update = m.isUpdate();
 
-                List<Object> mappedList = switch (localMap(xmlSet, m.getTemplateId(), path)) {
+                List<Object> mappedList = switch (localMap(xmlSet, m.getTemplateId(), path, cache)) {
                     case List l -> l;
                     case Map ml -> List.of(ml);
                     case null -> new ArrayList<>();
@@ -388,9 +392,9 @@ public final class OpenEhrObds {
                             && Settings.getMapping().get(newPath).get(0).isList()) {
                         Map<String, Object> tmpList = new HashMap<>();
                         tmpList.put("list", List.of(h));
-                        walkTree(tmpList.entrySet(), newDepth, newPath, theMap);
+                        walkTree(tmpList.entrySet(), newDepth, newPath, theMap, cache);
                     } else {
-                        walkTree(h.entrySet(), newDepth, newPath, theMap);
+                        walkTree(h.entrySet(), newDepth, newPath, theMap, cache);
                     }
                 }
                 case @SuppressWarnings("rawtypes") List a -> {
@@ -398,11 +402,11 @@ public final class OpenEhrObds {
                             && Settings.getMapping().get(newPath).get(0).isList()) {
                         Map<String, Object> tmpList = new HashMap<>();
                         tmpList.put("list", a);
-                        walkTree(tmpList.entrySet(), newDepth, newPath, theMap);
+                        walkTree(tmpList.entrySet(), newDepth, newPath, theMap, cache);
                     } else {
                         for (Object b : a) {
                             if (b instanceof Map) {
-                                walkTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap);
+                                walkTree(((Map<String, Object>) b).entrySet(), newDepth, newPath, theMap, cache);
                             }
                         }
                     }
