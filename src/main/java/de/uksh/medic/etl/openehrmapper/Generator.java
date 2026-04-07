@@ -36,6 +36,7 @@ import com.nedap.archie.rm.datavalues.quantity.datetime.DvTime;
 import com.nedap.archie.rm.generic.PartySelf;
 import com.nedap.archie.rm.support.identification.ArchetypeID;
 import com.nedap.archie.rm.support.identification.TerminologyId;
+import de.uksh.medic.etl.model.DatatypeMapping;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.Violation;
 import java.lang.reflect.InvocationTargetException;
@@ -524,16 +525,28 @@ public class Generator {
         }
 
         ((List<Object>) map.get(nodeId)).forEach(e -> {
+            if (e instanceof Map || e instanceof List) {
+                return;
+            }
             Element el = new Element();
             el.setArchetypeNodeId(nodeId);
             el.setNameAsString(label);
             Map<String, Object> mo = new HashMap<>();
-            mo.put(nodeId, e);
             mo.put("name", name);
-            if (e instanceof Map || e instanceof List) {
-                return;
+
+            if (e instanceof DatatypeMapping) {
+                mo.put(nodeId, ((DatatypeMapping) e).getValue());
+                Map<String, Object> maMap = new HashMap<>();
+                MappingAttributes ma = new MappingAttributes();
+                ma.setDatatype(((DatatypeMapping) e).getDatatype());
+                maMap.put(nodeId, ma);
+                processAttributeChildren(newPath, nodeId, el, mo, maMap, violations);
+
+            } else {
+                mo.put(nodeId, e);
+                processAttributeChildren(newPath, nodeId, el, mo, datatypes, violations);
             }
-            processAttributeChildren(newPath, nodeId, el, mo, datatypes, violations);
+
             ((ArrayList<Element>) jsonmap).add(el);
 
         });
