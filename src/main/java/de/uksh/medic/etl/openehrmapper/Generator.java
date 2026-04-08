@@ -751,7 +751,6 @@ public class Generator {
                     return;
                 }
                 magnitude = Double.valueOf(magnitudeS);
-                precision = -1L;
                 if (m.length == 3) {
                     precision = Long.valueOf(m[2]);
                 }
