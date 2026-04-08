@@ -24,6 +24,7 @@ import com.nedap.archie.rm.datavalues.DvCodedText;
 import com.nedap.archie.rm.datavalues.DvIdentifier;
 import com.nedap.archie.rm.datavalues.DvText;
 import com.nedap.archie.rm.datavalues.DvURI;
+import com.nedap.archie.rm.datavalues.TermMapping;
 import com.nedap.archie.rm.datavalues.quantity.DvCount;
 import com.nedap.archie.rm.datavalues.quantity.DvInterval;
 import com.nedap.archie.rm.datavalues.quantity.DvOrdinal;
@@ -540,6 +541,10 @@ public class Generator {
                 MappingAttributes ma = new MappingAttributes();
                 ma.setDatatype(((DatatypeMapping) e).getDatatype());
                 maMap.put(nodeId, ma);
+                mo.put("mapping_" + nodeId, ((DatatypeMapping) e).getMappings());
+                if (ma.getDatatype() == null || "".equals(ma.getDatatype())) {
+                    maMap = datatypes;
+                }
                 processAttributeChildren(newPath, nodeId, el, mo, maMap, violations);
 
             } else {
@@ -676,6 +681,36 @@ public class Generator {
             case null -> {
             }
             default -> {
+            }
+        }
+        if (map.containsKey("mapping_" + name)) {
+            List<DatatypeMapping> ldm = (List<DatatypeMapping>) map.get("mapping_" + name);
+            for (DatatypeMapping dm : ldm) {
+                TermMapping tm = new TermMapping();
+                CodePhrase cp = null;
+                switch (dm.getValue()) {
+                    case Coding coding -> {
+                        cp = new CodePhrase(new TerminologyId(coding.getSystem(), coding.getVersion()),
+                                coding.getCode());
+                    }
+                    case String s -> {
+                        String terminology = getLocalTerminologyId(path);
+                        String display = getLocalTerminologyTerm((String) map.get("name"), name, s);
+                        if ("".equals(display)) {
+                            String local = getLocalTerm(path, s);
+                            cp = new CodePhrase(new TerminologyId(terminology), local, s);
+                        } else {
+                            cp = new CodePhrase(new TerminologyId(terminology), s, display);
+                        }
+                    }
+                    case null -> {
+                    }
+                    default -> {
+                    }
+                }
+                tm.setTarget(cp);
+                tm.setMatch(dm.getDatatype().charAt(0));
+                ct.addMapping(tm);
             }
         }
 
