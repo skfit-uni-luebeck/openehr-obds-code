@@ -5,7 +5,7 @@ public class DatatypeMapping {
     private String datatype;
     private Object value;
 
-    public DatatypeMapping(String datatype, String value) {
+    public DatatypeMapping(String datatype, Object value) {
         this.datatype = datatype;
         this.value = value;
     }
