@@ -649,7 +649,6 @@ public class Generator {
 
     public void gen_DV_CODED_TEXT(String path, String name, Object jsonmap,
             Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
-
         DvCodedText ct = new DvCodedText();
         switch (map.get(name)) {
             case Coding coding -> {
@@ -691,7 +690,7 @@ public class Generator {
                 switch (dm.getValue()) {
                     case Coding coding -> {
                         cp = new CodePhrase(new TerminologyId(coding.getSystem(), coding.getVersion()),
-                                coding.getCode());
+                                coding.getCode(), coding.getDisplay());
                     }
                     case String s -> {
                         String terminology = getLocalTerminologyId(path);
