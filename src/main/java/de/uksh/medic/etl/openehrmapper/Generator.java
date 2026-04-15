@@ -102,8 +102,7 @@ public class Generator {
                 Logger.debug("Filtered out gen_STRING!");
                 return;
             }
-            type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "").replace("_INTERVAL_DV_QUANTITY_",
-                    "_QUANTITY");
+            type = type.replaceAll("[^A-Za-z_]+", "_").replace("POINT_", "");
             Method met;
             try {
                 met = this.getClass().getMethod(type, String.class, String.class, Object.class,
@@ -742,6 +741,83 @@ public class Generator {
         DvInterval<DvTime> dvi = new DvInterval<>();
         dvi.setLower(new DvTime(intervals[0]));
         dvi.setUpper(new DvTime(intervals[1]));
+        ((Element) jsonmap).setValue(dvi);
+    }
+
+    @SuppressWarnings({ "MagicNumber" })
+    public void gen_DV_INTERVAL_DV_QUANTITY_(String path, String name, Object jsonmap,
+            Map<String, Object[]> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
+        Object[] intervals = map.get(name);
+        if (intervals.length != 2) {
+            return;
+        }
+        DvInterval<DvQuantity> dvi = new DvInterval<>();
+
+        for (int i = 0; i < intervals.length; i++) {
+            DvQuantity dvq = null;
+            String unit = null;
+            Double magnitude = null;
+            Long precision = null;
+            String unitDisplayName = null;
+
+            if (intervals[i] == null) {
+                continue;
+            }
+
+            switch (intervals[i]) {
+                case String s -> {
+                    unit = "1";
+                    magnitude = Double.valueOf(s);
+                    precision = 1L;
+                }
+                case String[] m -> {
+                    String magnitudeS = m[0];
+                    if (magnitudeS == null || magnitudeS.isBlank()) {
+                        return;
+                    }
+                    magnitude = Double.valueOf(magnitudeS);
+                    if (m.length == 3) {
+                        precision = Long.valueOf(m[2]);
+                    }
+                    unit = (String) m[1];
+                }
+                case Quantity q -> {
+                    if (q.getCode() == null) {
+                        q.setCode("1");
+                    }
+                    unit = q.getCode();
+                    magnitude = q.getValue().doubleValue();
+                    precision = Long.valueOf(q.getValue().precision());
+                    if (q.getUnit() != null) {
+                        unitDisplayName = q.getUnit();
+                    }
+                }
+                case DvQuantity q -> dvq = q;
+                default -> {
+                }
+            }
+
+            if (magnitude == null) {
+                return;
+            }
+
+            if (((Element) jsonmap).getValue() != null && isInBounds(path, unit, magnitude, violations)) {
+                dvq = new DvQuantity(unit, magnitude, precision);
+                if (unitDisplayName != null) {
+                    dvq.setUnitsDisplayName(unitDisplayName);
+                }
+            }
+
+            if (i == 0) {
+                dvi.setLower(dvq);
+                dvi.setLowerIncluded(true);
+            }
+            if (i == 1) {
+                dvi.setUpper(dvq);
+                dvi.setUpperIncluded(true);
+            }
+        }
+
         ((Element) jsonmap).setValue(dvi);
     }
 
