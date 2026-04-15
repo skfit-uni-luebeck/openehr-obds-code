@@ -801,6 +801,7 @@ public class Generator {
                     unitDisplayName = q.getUnit();
                 }
             }
+            case DvQuantity dvq -> ((Element) jsonmap).setValue(dvq);
             default -> {
             }
         }
@@ -809,7 +810,7 @@ public class Generator {
             return;
         }
 
-        if (isInBounds(path, unit, magnitude, violations)) {
+        if (((Element) jsonmap).getValue() != null && isInBounds(path, unit, magnitude, violations)) {
             DvQuantity dvq = new DvQuantity(unit, magnitude, precision);
             if (unitDisplayName != null) {
                 dvq.setUnitsDisplayName(unitDisplayName);
