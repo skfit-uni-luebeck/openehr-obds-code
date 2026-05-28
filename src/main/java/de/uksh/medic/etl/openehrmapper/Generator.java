@@ -915,6 +915,7 @@ public class Generator {
                     ((Element) jsonmap).setValue(dvp);
                 }
             }
+            case DvProportion dvp -> ((Element) jsonmap).setValue(dvp);
             default -> {
             }
         }
