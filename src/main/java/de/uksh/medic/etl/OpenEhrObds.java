@@ -91,6 +91,8 @@ public final class OpenEhrObds {
     private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
     private static Integer i = 0;
+    private static final int DEFAULT_RECONNECT_DELAY_MS = 1000;
+    private static final int MAX_RECONNECT_DELAY_MS = 30000;
     private static DefaultRestClient openEhrClient;
     private static Map<String, Object> openehrDatatypes = new HashMap<>();
     private static FhirResolver fr;
@@ -100,6 +102,7 @@ public final class OpenEhrObds {
     private OpenEhrObds() {
     }
 
+    @SuppressWarnings({ "IllegalCatch", "MethodLength" })
     public static void main(String[] args) throws IOException, KeyStoreException, GeneralSecurityException {
         InputStream settingsYaml = ClassLoader.getSystemClassLoader().getResourceAsStream("settings.yml");
         if (args.length == 1) {
@@ -192,6 +195,7 @@ public final class OpenEhrObds {
             System.exit(0);
         }
 
+        int reconnectDelay = DEFAULT_RECONNECT_DELAY_MS;
         while (true) {
             try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(KafkaUtils.getConsumerProperties());
                     KafkaProducer<String, String> producer = new KafkaProducer<>(KafkaUtils.getProducerProperties())) {
@@ -211,6 +215,9 @@ public final class OpenEhrObds {
                 }));
 
                 consumer.subscribe(Collections.singleton(Settings.getKafka().getReadTopic()));
+                Logger.info("Consumer subscribed to topic: {}", Settings.getKafka().getReadTopic());
+                // Reset reconnect delay on successful subscription
+                reconnectDelay = DEFAULT_RECONNECT_DELAY_MS;
 
                 while (true) {
                     Logger.debug("Polling Kafka topic");
@@ -228,21 +235,50 @@ public final class OpenEhrObds {
                             map.put("datalake_id", entries.get("datalake_id"));
                             walkTree(entries.entrySet(), 1, "", map, cache);
                         } catch (ProcessingException e) {
-                            Logger.error("ProcessingException occured, writing to error topic!");
-                            producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), record.value()));
-                            producer.flush();
+                            Logger.error("ProcessingException occurred, writing to error topic!", e);
+                            sendToErrorTopic(producer, record.value());
+                        } catch (Exception e) {
+                            Logger.error(
+                                "Unexpected error processing record, "
+                                + "wrapping as ProcessingException, writing to error topic!", e);
+                            sendToErrorTopic(producer, record.value());
                         }
                         SPEED.put(UUID.randomUUID().toString(), "success");
                     }
                     try {
                         consumer.commitSync();
                     } catch (CommitFailedException e) {
-                        Logger.debug("Got kicked out of consumer group.");
+                        Logger.warn(
+                            "CommitFailedException: consumer got kicked out of consumer "
+                            + "group. Breaking inner loop to re-subscribe.");
+                        break; // Break inner loop to allow consumer group rebalance
                     }
                 }
             } catch (WakeupException e) {
-                Logger.debug("Caught wake up exception.");
+                Logger.info("Caught WakeupException (shutdown requested). Exiting.");
+                break; // Shutdown was requested, exit the outer loop
+            } catch (Exception e) {
+                Logger.error(
+                    "Unexpected exception in consumer loop, "
+                    + "restarting consumer in {}ms...", reconnectDelay, e);
+                try {
+                    TimeUnit.MILLISECONDS.sleep(reconnectDelay);
+                } catch (InterruptedException ie) {
+                    Logger.warn("Interrupted while waiting to reconnect");
+                }
+                // Exponential backoff, max MAX_RECONNECT_DELAY_MS
+                reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
             }
+        }
+    }
+
+    @SuppressWarnings({ "IllegalCatch", "NestedTryDepth" })
+    private static void sendToErrorTopic(KafkaProducer<String, String> producer, String recordValue) {
+        try {
+            producer.send(new ProducerRecord<>(Settings.getKafka().getErrorTopic(), recordValue));
+            producer.flush();
+        } catch (Exception pe) {
+            Logger.error("Failed to send record to error topic", pe);
         }
     }
 
