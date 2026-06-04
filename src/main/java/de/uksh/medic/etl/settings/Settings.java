@@ -2,6 +2,7 @@ package de.uksh.medic.etl.settings;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.File;
 import java.net.URI;
 import java.net.URL;
 import java.util.List;
@@ -15,6 +16,8 @@ public final class Settings {
 
     private static URL fhirTsUrl;
     private static URL fhirServerUrl;
+    private static File fhirServerKeystore;
+    private static String fhirServerKeystorePassword;
     private static URI openEhrUrl;
     private static String openEhrUser;
     private static String openEhrPassword;
@@ -37,6 +40,14 @@ public final class Settings {
 
     public static URL getFhirServerUrl() {
         return fhirServerUrl;
+    }
+
+    public static File getFhirServerKeystore() {
+        return fhirServerKeystore;
+    }
+
+    public static String getFhirServerKeystorePassword() {
+        return fhirServerKeystorePassword;
     }
 
     public static String getMode() {
@@ -65,6 +76,16 @@ public final class Settings {
     @JsonProperty("fhirServerUrl")
     public void setFhirServerUrl(URL newFhirServerUrl) {
         fhirServerUrl = newFhirServerUrl;
+    }
+
+    @JsonProperty("fhirServerKeystore")
+    public void setFhirServerKeystore(File newFhirServerKeystore) {
+        fhirServerKeystore = newFhirServerKeystore;
+    }
+
+    @JsonProperty("fhirServerKeystorePassword")
+    public void setFhirServerKeystorePassword(String newFhirServerKeystorePassword) {
+        fhirServerKeystorePassword = newFhirServerKeystorePassword;
     }
 
     public static URI getOpenEhrUrl() {

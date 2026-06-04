@@ -1,6 +1,7 @@
 package de.uksh.medic.etl;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.client.apache.ApacheRestfulClientFactory;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -18,13 +19,19 @@ import com.nedap.archie.rm.support.identification.HierObjectId;
 import com.nedap.archie.rm.support.identification.ObjectVersionId;
 import com.nedap.archie.rm.support.identification.PartyRef;
 import de.uksh.medic.etl.jobs.FhirResolver;
-import de.uksh.medic.etl.jobs.mdr.centraxx.*;
+import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrAttributes;
+import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrConvert;
+import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrItemSet;
+import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrLogin;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.model.mdr.centraxx.CxxItemSet;
 import de.uksh.medic.etl.model.mdr.centraxx.RelationConvert;
 import de.uksh.medic.etl.openehrmapper.EHRParser;
 import de.uksh.medic.etl.openehrmapper.Generator;
-import de.uksh.medic.etl.settings.*;
+import de.uksh.medic.etl.settings.ConfigurationLoader;
+import de.uksh.medic.etl.settings.CxxMdrSettings;
+import de.uksh.medic.etl.settings.Mapping;
+import de.uksh.medic.etl.settings.Settings;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import java.io.BufferedWriter;
@@ -36,12 +43,28 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 import javax.xml.namespace.QName;
 import javax.xml.xpath.XPathExpressionException;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -77,7 +100,7 @@ public final class OpenEhrObds {
     private OpenEhrObds() {
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, KeyStoreException, GeneralSecurityException {
         InputStream settingsYaml = ClassLoader.getSystemClassLoader().getResourceAsStream("settings.yml");
         if (args.length == 1) {
             settingsYaml = new FileInputStream(args[0]);
@@ -88,8 +111,35 @@ public final class OpenEhrObds {
 
         fr = new FhirResolver();
         if (Settings.getFhirServerUrl() != null) {
-            fc = FhirContext.forR4().newRestfulGenericClient(Settings.getFhirServerUrl().toString());
+            FhirContext fcCtx = FhirContext.forR4();
+
+            if (Settings.getFhirServerKeystore() != null) {
+
+                KeyStore keyStore = KeyStore.getInstance("PKCS12");
+                try (InputStream is = new FileInputStream(Settings.getFhirServerKeystore())) {
+                    keyStore.load(is, Settings.getFhirServerKeystorePassword().toCharArray());
+                }
+
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance(
+                        KeyManagerFactory.getDefaultAlgorithm());
+                kmf.init(keyStore, Settings.getFhirServerKeystorePassword().toCharArray());
+
+                SSLContext sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(kmf.getKeyManagers(), null, null);
+
+                CloseableHttpClient httpClient = HttpClients.custom()
+                        .setSSLContext(sslContext)
+                        .build();
+
+                ApacheRestfulClientFactory factory = new ApacheRestfulClientFactory(fcCtx);
+                factory.setHttpClient(httpClient);
+                fcCtx.setRestfulClientFactory(factory);
+
+            }
+
+            fc = fcCtx.newRestfulGenericClient(Settings.getFhirServerUrl().toString());
         }
+
         CxxMdrSettings mdrSettings = Settings.getCxxmdr();
         if (mdrSettings != null) {
             CxxMdrLogin.login(mdrSettings);
@@ -268,7 +318,7 @@ public final class OpenEhrObds {
         }
     }
 
-    @SuppressWarnings({ "unchecked", "IllegalCatch" })
+    @SuppressWarnings({ "IllegalCatch" })
     public static Object localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path,
             Map<String, Object> cache) {
         Binding b = new Binding();
@@ -282,7 +332,7 @@ public final class OpenEhrObds {
         b.setVariable("cache", cache);
 
         if (Settings.getDev()) {
-            return javaMap(xmlSet, path, fc, fr, openEhrClient, um, cache);
+            return Mapper.javaMap(xmlSet, path, fc, fr, openEhrClient, um, cache);
         } else {
             try {
                 File groovyFile = new File("scripts", templateId + ".groovy");
@@ -295,12 +345,6 @@ public final class OpenEhrObds {
         }
 
         return new HashMap<>();
-    }
-
-    @SuppressWarnings({ "HiddenField" })
-    public static Object javaMap(Set<Entry<String, Object>> xmlSet, String path, IGenericClient fhirClient,
-            FhirResolver fhirResolver, DefaultRestClient openEhrClient, UtilMethods utils, Map<String, Object> cache) {
-        return null;
     }
 
     @SuppressWarnings({ "unchecked" })
