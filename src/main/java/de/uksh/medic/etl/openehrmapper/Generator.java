@@ -792,7 +792,12 @@ public class Generator {
                         unitDisplayName = q.getUnit();
                     }
                 }
-                case DvQuantity q -> dvq = q;
+                case DvQuantity q -> {
+                    dvq = q;
+                    unit = q.getUnits();
+                    magnitude = q.getMagnitude();
+                    precision = q.getPrecision();
+                }
                 default -> {
                 }
             }
