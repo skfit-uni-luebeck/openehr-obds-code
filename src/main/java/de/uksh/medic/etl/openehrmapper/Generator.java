@@ -595,15 +595,25 @@ public class Generator {
             label = getLabel(path, nodeId, name);
         }
         String newPath = path + "/attributes";
+        String statePath = path + "/attributes[rm_attribute_name=\"state\"]";
+        Boolean hasState = (Boolean) XP.evaluate(statePath, opt, XPathConstants.BOOLEAN);
+
         Event<ItemStructure> events = new PointEvent<>();
         events.setArchetypeNodeId(nodeId);
-
         events.setNameAsString(label);
-
         events.setTime(new DvDateTime(((List<String>) map.get("events_time")).getFirst()));
+
         ItemTree itemTree = new ItemTree();
         processAttributeChildren(newPath, name, itemTree, map, datatypes, violations);
         events.setData(itemTree);
+
+        if (hasState) {
+            ItemTree stateTree = new ItemTree();
+            processAttributeChildren(statePath, name, stateTree, map, datatypes, violations);
+            if (stateTree.getItems() != null && stateTree.getItems().size() > 0) {
+                events.setState(stateTree);
+            }
+        }
 
         ((History<ItemStructure>) jsonmap).addEvent(events);
     }
@@ -891,7 +901,7 @@ public class Generator {
             return;
         }
 
-        if (((Element) jsonmap).getValue() != null && isInBounds(path, unit, magnitude, violations)) {
+        if (magnitude != null && isInBounds(path, unit, magnitude, violations)) {
             DvQuantity dvq = new DvQuantity(unit, magnitude, precision);
             if (unitDisplayName != null) {
                 dvq.setUnitsDisplayName(unitDisplayName);
@@ -920,6 +930,7 @@ public class Generator {
                     ((Element) jsonmap).setValue(dvp);
                 }
             }
+            case DvProportion dvp -> ((Element) jsonmap).setValue(dvp);
             default -> {
             }
         }
