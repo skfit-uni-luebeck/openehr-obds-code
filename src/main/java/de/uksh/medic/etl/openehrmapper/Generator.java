@@ -471,13 +471,14 @@ public class Generator {
         String aNodeId = isSlot ? paramName : nodeId;
         String newPath = path + "/attributes";
         String code = !"".equals(paramName) && !name.equals(paramName) ? paramName : nodeId;
-        if (!map.containsKey(code)) {
-            return;
-        }
         String label = getLabel(path, nodeId, paramName);
 
+        if (!(map.containsKey(code) || map.containsKey(code + "," + label))) {
+            return;
+        }
+
         List<Map<String, Object>> l;
-        String usedCode = map.containsKey(aNodeId) ? aNodeId : code;
+        String baseCode = map.containsKey(aNodeId) ? aNodeId : code;
         if (!map.containsKey(aNodeId)) {
             l = (List<Map<String, Object>>) map.get(code);
         } else if (map.get(aNodeId) instanceof List) {
@@ -485,6 +486,20 @@ public class Generator {
         } else {
             l = List.of((Map<String, Object>) map.get(aNodeId));
         }
+        final String usedCode;
+        if (map.containsKey(aNodeId + "," + label) || map.containsKey(code + "," + label)) {
+            usedCode = baseCode + "," + label;
+            if (!map.containsKey(aNodeId + "," + label)) {
+                l = (List<Map<String, Object>>) map.get(code + "," + label);
+            } else if (map.get(aNodeId + "," + label) instanceof List) {
+                l = (List<Map<String, Object>>) map.get(aNodeId + "," + label);
+            } else {
+                l = List.of((Map<String, Object>) map.get(aNodeId + "," + label));
+            }
+        } else {
+            usedCode = baseCode;
+        }
+
 
         l.forEach(le -> {
 
