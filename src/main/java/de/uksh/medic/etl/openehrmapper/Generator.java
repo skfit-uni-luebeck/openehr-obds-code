@@ -706,7 +706,7 @@ public class Generator {
             default -> {
             }
         }
-        if (map.containsKey("mapping_" + name)) {
+        if (map.containsKey("mapping_" + name) && map.get("mapping_" + name) != null) {
             List<DatatypeMapping> ldm = (List<DatatypeMapping>) map.get("mapping_" + name);
             for (DatatypeMapping dm : ldm) {
                 TermMapping tm = new TermMapping();
