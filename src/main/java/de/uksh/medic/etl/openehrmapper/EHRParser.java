@@ -136,6 +136,9 @@ public class EHRParser {
             identifier.setId(hcf.get("id").get(0));
             context.setHealthCareFacility(new PartyIdentified(null, hcf.get("name").get(0), List.of(identifier)));
         }
+        if (map.containsKey("location")) {
+            context.setLocation(((List<String>) map.get("location")).get(0));
+        }
         composition.setContext(context);
         ItemTree itemTree = new ItemTree();
         context.setOtherContext(itemTree);
