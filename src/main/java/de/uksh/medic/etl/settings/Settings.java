@@ -31,6 +31,7 @@ public final class Settings {
     private static String namespace;
     private static int cacheSize;
     private static String testDataDir;
+    private static ServerCheckSettings serverCheck = new ServerCheckSettings();
 
     private Settings() {}
 
@@ -185,6 +186,15 @@ public final class Settings {
     @JsonProperty("testDataDir")
     public void setTestDataDir(String newTestDataDir) {
         testDataDir = newTestDataDir;
+    }
+
+    public static ServerCheckSettings getServerCheck() {
+        return serverCheck;
+    }
+
+    @JsonProperty("serverCheck")
+    public void setServerCheck(ServerCheckSettings newServerCheck) {
+        serverCheck = newServerCheck;
     }
 
 }

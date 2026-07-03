@@ -31,6 +31,7 @@ import de.uksh.medic.etl.openehrmapper.Generator;
 import de.uksh.medic.etl.settings.ConfigurationLoader;
 import de.uksh.medic.etl.settings.CxxMdrSettings;
 import de.uksh.medic.etl.settings.Mapping;
+import de.uksh.medic.etl.settings.ServerCheckSettings;
 import de.uksh.medic.etl.settings.Settings;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
@@ -98,6 +99,7 @@ public final class OpenEhrObds {
     private static FhirResolver fr;
     private static UtilMethods um = new UtilMethods();
     private static IGenericClient fc;
+    private static IGenericClient fhirTsClient;
 
     private OpenEhrObds() {
     }
@@ -112,7 +114,10 @@ public final class OpenEhrObds {
         ConfigurationLoader configLoader = new ConfigurationLoader();
         configLoader.loadConfiguration(settingsYaml, Settings.class);
 
+        // Initialize FHIR terminology server client
         fr = new FhirResolver();
+        fhirTsClient = FhirResolver.getTerminologyClient();
+
         if (Settings.getFhirServerUrl() != null) {
             FhirContext fcCtx = FhirContext.forR4();
 
@@ -159,6 +164,9 @@ public final class OpenEhrObds {
 
         openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
 
+        // Initialize server availability monitoring
+        ServerAvailability.init(openEhrClient, fhirTsClient);
+
         ObjectMapper mapper;
         JsonMapper jm = new JsonMapper();
 
@@ -170,6 +178,17 @@ public final class OpenEhrObds {
 
         Settings.getMapping().values().forEach(m -> m.forEach(n -> initializeAttribute(n, jm)));
 
+        // Start server availability monitoring and wait for servers
+        ServerCheckSettings serverCheck = Settings.getServerCheck();
+        if (serverCheck.isEnabled()) {
+            ServerAvailability.startMonitor(serverCheck.getIntervalMs());
+
+            if (!ServerAvailability.waitUntilAvailable(serverCheck.getIntervalMs(), serverCheck.getTimeoutMs())) {
+                Logger.error("Servers not available within timeout, shutting down");
+                System.exit(1);
+            }
+        }
+
         spark.Spark.get("/health", (request, response) -> {
             response.type("application/json");
             return "{\"msgsPerMinute\": " + SPEED.estimatedSize() + ", \"cacheSize\": " + fr.getCacheSize() + "}";
@@ -179,6 +198,10 @@ public final class OpenEhrObds {
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
+            // Pause monitor during local file processing
+            if (serverCheck.isEnabled()) {
+                ServerAvailability.pauseMonitor();
+            }
             File[] files = new File(Settings.getTestDataDir()).listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
@@ -220,10 +243,27 @@ public final class OpenEhrObds {
                 reconnectDelay = DEFAULT_RECONNECT_DELAY_MS;
 
                 while (true) {
+                    // Check server availability before polling
+                    if (serverCheck.isEnabled() && !ServerAvailability.allAvailable()) {
+                        Logger.info("Server unavailable, waiting before next poll...");
+                        try {
+                            Thread.sleep(serverCheck.getIntervalMs());
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        continue;
+                    }
+
                     Logger.debug("Polling Kafka topic");
                     ConsumerRecords<String, String> records = consumer.poll(
                             Duration.ofMillis(Settings.getKafka().getPollDuration()));
 
+                    // Pause server availability monitor during data processing
+                    // to avoid unnecessary FHIR server queries while processing
+                    if (serverCheck.isEnabled()) {
+                        ServerAvailability.pauseMonitor();
+                    }
                     for (ConsumerRecord<String, String> record : records) {
                         Logger.debug("Processing record.");
                         try {
@@ -239,8 +279,9 @@ public final class OpenEhrObds {
                             sendToErrorTopic(producer, record.value());
                         } catch (Exception e) {
                             Logger.error(
-                                "Unexpected error processing record, "
-                                + "wrapping as ProcessingException, writing to error topic!", e);
+                                    "Unexpected error processing record, "
+                                            + "wrapping as ProcessingException, writing to error topic!",
+                                    e);
                             sendToErrorTopic(producer, record.value());
                         }
                         SPEED.put(UUID.randomUUID().toString(), "success");
@@ -249,9 +290,17 @@ public final class OpenEhrObds {
                         consumer.commitSync();
                     } catch (CommitFailedException e) {
                         Logger.warn(
-                            "CommitFailedException: consumer got kicked out of consumer "
-                            + "group. Breaking inner loop to re-subscribe.");
+                                "CommitFailedException: consumer got kicked out of consumer "
+                                        + "group. Breaking inner loop to re-subscribe.");
+                        // Resume monitor before breaking
+                        if (serverCheck.isEnabled()) {
+                            ServerAvailability.resumeMonitor();
+                        }
                         break; // Break inner loop to allow consumer group rebalance
+                    }
+                    // Resume server availability monitor after processing
+                    if (serverCheck.isEnabled()) {
+                        ServerAvailability.resumeMonitor();
                     }
                 }
             } catch (WakeupException e) {
@@ -259,8 +308,9 @@ public final class OpenEhrObds {
                 break; // Shutdown was requested, exit the outer loop
             } catch (Exception e) {
                 Logger.error(
-                    "Unexpected exception in consumer loop, "
-                    + "restarting consumer in {}ms...", reconnectDelay, e);
+                        "Unexpected exception in consumer loop, "
+                                + "restarting consumer in {}ms...",
+                        reconnectDelay, e);
                 try {
                     TimeUnit.MILLISECONDS.sleep(reconnectDelay);
                 } catch (InterruptedException ie) {
@@ -580,6 +630,7 @@ public final class OpenEhrObds {
                     throw new ProcessingException();
                 }
             } catch (WrongStatusCodeException e) {
+                ServerAvailability.markOpenEhrUnavailable();
                 Logger.error("Unable to create EHR due to internal server error. Trying again. Error was: {}",
                         e.getMessage());
                 try {
@@ -603,6 +654,7 @@ public final class OpenEhrObds {
         try {
             openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
         } catch (WrongStatusCodeException e) {
+            ServerAvailability.markOpenEhrUnavailable();
             String comp = "";
             try {
                 JacksonUtil.getObjectMapper().writeValueAsString(composition);

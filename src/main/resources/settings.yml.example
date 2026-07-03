@@ -1,15 +1,18 @@
 mode:
+fhirTsUrl:
+fhirServerUrl:
+fhirServerKeystore:
+fhirServerKeystorePassword:
+openEhrUrl:
+openEhrUser:
+openEhrPassword:
 cxxmdr:
    url:
+   token:
    username:
    password:
    basicUsername:
    basicPassword:
-fhirTsUrl:
-openEhrUrl:
-openEhrUser:
-openEhrPassword:
-xdsUrl:
 kafka:
   clientID:
   url:
@@ -26,7 +29,17 @@ mapping:
     target: openehr-obds-patient
     targetVersion: 1
     split: false
+    global: false
     templateId:
-    uniqueComposition: false
+    update: false
+    list: false
 depthLimit: 4
 systemId:
+dev: false
+namespace:
+cacheSize:
+testDataDir:
+serverCheck:
+  enabled: true
+  intervalMs: 5000
+  timeoutMs: 0

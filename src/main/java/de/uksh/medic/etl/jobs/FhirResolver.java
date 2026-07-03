@@ -7,6 +7,7 @@ import ca.uhn.fhir.rest.client.interceptor.AdditionalRequestHeadersInterceptor;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.uksh.medic.etl.ServerAvailability;
 import de.uksh.medic.etl.settings.Settings;
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +41,13 @@ public final class FhirResolver {
             interceptor.addHeaderValue("User-Agent", topicName);
             terminologyClient.registerInterceptor(interceptor);
         }
+    }
+
+    /**
+     * @return the FHIR terminology client, or null if not configured
+     */
+    public static IGenericClient getTerminologyClient() {
+        return terminologyClient;
     }
 
     public Coding conceptMap(URI conceptMapUri, URI system, URI source, URI target, String input) {
@@ -86,6 +94,7 @@ public final class FhirResolver {
             }
 
         } catch (FhirClientConnectionException e) {
+            ServerAvailability.markFhirTsUnavailable();
             Logger.error("Could not connect to FHIR Terminology Server", e);
         }
 
@@ -133,6 +142,7 @@ public final class FhirResolver {
             return coding;
 
         } catch (FhirClientConnectionException e) {
+            ServerAvailability.markFhirTsUnavailable();
             Logger.error("Could not connect to FHIR Terminology Server", e);
         } catch (ResourceNotFoundException e) {
             Logger.error("Could not look up because system was not found.");
@@ -203,6 +213,7 @@ public final class FhirResolver {
             return coding;
 
         } catch (FhirClientConnectionException e) {
+            ServerAvailability.markFhirTsUnavailable();
             Logger.error("Could not connect to FHIR Terminology Server", e);
         } catch (ResourceNotFoundException e) {
             Logger.error("Could not look up because system was not found.");
