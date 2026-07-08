@@ -34,7 +34,8 @@ import de.uksh.medic.etl.settings.Mapping;
 import de.uksh.medic.etl.settings.ServerCheckSettings;
 import de.uksh.medic.etl.settings.Settings;
 import groovy.lang.Binding;
-import groovy.lang.GroovyShell;
+import groovy.lang.GroovyClassLoader;
+import groovy.lang.Script;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -83,7 +84,7 @@ import org.ehrbase.openehr.sdk.util.exception.WrongStatusCodeException;
 import org.openehr.schemas.v1.OPERATIONALTEMPLATE;
 import org.tinylog.Logger;
 
-public final class OpenEhrObds {
+public final class MedicEtlToolkit {
 
     private static final Cache<String, Object> SPEED = Caffeine.newBuilder()
             .expireAfterWrite(60, TimeUnit.SECONDS).build();
@@ -91,6 +92,8 @@ public final class OpenEhrObds {
     private static final Map<String, Object> OPENEHR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
     private static final Map<String, EHRParser> PARSERS = new HashMap<>();
+    private static final Map<String, Class<? extends Script>> GROOVY_SCRIPTS = new HashMap<>();
+    private static GroovyClassLoader groovyClassLoader;
     private static Integer i = 0;
     private static final int DEFAULT_RECONNECT_DELAY_MS = 1000;
     private static final int MAX_RECONNECT_DELAY_MS = 30000;
@@ -101,7 +104,7 @@ public final class OpenEhrObds {
     private static IGenericClient fc;
     private static IGenericClient fhirTsClient;
 
-    private OpenEhrObds() {
+    private MedicEtlToolkit() {
     }
 
     @SuppressWarnings({ "IllegalCatch", "MethodLength" })
@@ -194,7 +197,7 @@ public final class OpenEhrObds {
             return "{\"msgsPerMinute\": " + SPEED.estimatedSize() + ", \"cacheSize\": " + fr.getCacheSize() + "}";
         });
 
-        Logger.info("OpenEhrObds started!");
+        Logger.info("MedicEtlToolkit started!");
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
@@ -352,6 +355,25 @@ public final class OpenEhrObds {
             XmlOptions opts = new XmlOptions();
             opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
             PARSERS.put(m.getTemplateId(), new EHRParser(template.xmlText(opts)));
+
+            // Pre-compile Groovy script for this template
+            if (Settings.getDev()) {
+                return;
+            }
+            File groovyFile = new File("scripts", m.getTemplateId() + ".groovy");
+            if (!groovyFile.exists()) {
+                return;
+            }
+            if (groovyClassLoader == null) {
+                groovyClassLoader = new GroovyClassLoader();
+            }
+            try {
+                Class<? extends Script> scriptClass = groovyClassLoader.parseClass(groovyFile);
+                GROOVY_SCRIPTS.put(m.getTemplateId(), scriptClass);
+                Logger.info("Pre-compiled Groovy script for template: {}", m.getTemplateId());
+            } catch (IOException e) {
+                Logger.error("Failed to pre-compile Groovy script for template {}: {}", m.getTemplateId(), e);
+            }
         }
 
         if (m.getSource() == null) {
@@ -407,26 +429,35 @@ public final class OpenEhrObds {
     @SuppressWarnings({ "IllegalCatch" })
     public static Object localMap(Set<Entry<String, Object>> xmlSet, String templateId, String path,
             Map<String, Object> cache) {
-        Binding b = new Binding();
-        GroovyShell s = new GroovyShell(b);
-        b.setVariable("xmlSet", xmlSet);
-        b.setVariable("path", path);
-        b.setVariable("fhirClient", fc);
-        b.setVariable("fhirResolver", fr);
-        b.setVariable("openEhrClient", openEhrClient);
-        b.setVariable("utils", um);
-        b.setVariable("cache", cache);
-
         if (Settings.getDev()) {
+            Binding b = new Binding();
+            b.setVariable("xmlSet", xmlSet);
+            b.setVariable("path", path);
+            b.setVariable("fhirClient", fc);
+            b.setVariable("fhirResolver", fr);
+            b.setVariable("openEhrClient", openEhrClient);
+            b.setVariable("utils", um);
+            b.setVariable("cache", cache);
             return Mapper.javaMap(xmlSet, path, fc, fr, openEhrClient, um, cache);
         } else {
-            try {
-                File groovyFile = new File("scripts", templateId + ".groovy");
-                if (groovyFile.exists()) {
-                    return s.evaluate(groovyFile);
+            // Use pre-compiled script instance
+            Class<? extends Script> scriptClass = GROOVY_SCRIPTS.get(templateId);
+            if (scriptClass != null) {
+                try {
+                    Script script = scriptClass.getDeclaredConstructor().newInstance();
+                    Binding b = new Binding();
+                    b.setVariable("xmlSet", xmlSet);
+                    b.setVariable("path", path);
+                    b.setVariable("fhirClient", fc);
+                    b.setVariable("fhirResolver", fr);
+                    b.setVariable("openEhrClient", openEhrClient);
+                    b.setVariable("utils", um);
+                    b.setVariable("cache", cache);
+                    script.setBinding(b);
+                    return script.run();
+                } catch (Exception e) {
+                    throw new ProcessingException(e);
                 }
-            } catch (Exception e) {
-                throw new ProcessingException(e);
             }
         }
 

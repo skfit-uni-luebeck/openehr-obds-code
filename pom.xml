@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>de.uksh.medic.etl</groupId>
-    <artifactId>openehr-obds</artifactId>
+    <artifactId>medic-etl-toolkit</artifactId>
     <version>0.1-SNAPSHOT</version>
 
     <properties>
@@ -18,7 +18,7 @@
         <maven-surefire-plugin.version>3.5.5</maven-surefire-plugin.version>
         <coveralls-maven-plugin.version>4.3.0</coveralls-maven-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
-        <exec.mainClass>de.uksh.medic.etl.OpenEhrObds</exec.mainClass>
+        <exec.mainClass>de.uksh.medic.etl.MedicEtlToolkit</exec.mainClass>
     </properties>
 
     <dependencies>
@@ -197,7 +197,7 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>de.uksh.medic.etl.OpenEhrObds</mainClass>
+                            <mainClass>de.uksh.medic.etl.MedicEtlToolkit</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

@@ -28,5 +28,5 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: ghcr.io/itcr-uni-luebeck/obds2openehr:latest
+          tags: ghcr.io/skfit-uni-luebeck/medic-etl-toolkit:latest
           platforms: linux/amd64,linux/arm64/v8

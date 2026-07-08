@@ -1,6 +1,8 @@
-# oBDS 2 openEHR
+# MeDIC-ETL-Toolkit
 
-This project is used to map [oBDS](https://www.basisdatensatz.de/basisdatensatz) (German oncological basis data set) data to openEHR using a FHIR Terminology Server and CentraXX MDR. The target openEHR templates are available [here](https://ckm.highmed.org/ckm/projects/1246.152.61).
+A toolkit for mapping various data formats to openEHR. It reads json/xml files from kafka, transforms them using groovy scripts to openEHR compositions, which then will be uploaded to the openEHR repository.
+
+This project was initially created to map [oBDS](https://www.basisdatensatz.de/basisdatensatz) (German oncological basis data set) data to openEHR using a FHIR Terminology Server and CentraXX MDR. The target openEHR templates are available [here](https://ckm.highmed.org/ckm/projects/1246.152.61).
 
 ## Get started
 
@@ -8,7 +10,7 @@ To get started, copy the `settings.yaml.example` file to `settings.yaml`. This a
 
 ### Running in container
 
-oBDS 2 openEHR is also available as a container. The image is available at `ghcr.io/skfit-uni-luebeck/obds2openehr:latest`. There are native builds available for `linux/amd64` and `linux/arm64/v8`.
+MeDIC-ETL-Toolkit is also available as a container. The image is available at `ghcr.io/skfit-uni-luebeck/medic-etl-toolkit:latest`. There are native builds available for `linux/amd64` and `linux/arm64/v8`.
 There is also a compose file available.
 
 ## Citation

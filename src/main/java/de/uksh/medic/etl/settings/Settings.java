@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Settings for OpenEhrObds.
+ * Settings for MedicEtlToolkit.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public final class Settings {
