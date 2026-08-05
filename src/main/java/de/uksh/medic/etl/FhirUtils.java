@@ -9,6 +9,7 @@ import de.uksh.medic.etl.jobs.mdr.centraxx.CxxMdrUnitConvert;
 import de.uksh.medic.etl.model.MappingAttributes;
 import de.uksh.medic.etl.settings.Mapping;
 import de.uksh.medic.etl.settings.Settings;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,25 +62,46 @@ public final class FhirUtils {
                         case Map map -> ((Map<String, String>) map).get("version");
                         default -> null;
                     };
-                    listed.add(fr.lookUp(fa.getSystem(), version, code));
+                    Codes.addLookupResult(listed, fr, fa.getSystem(), version, code);
                 } else if (fa.getConceptMap() != null) {
-                    Coding c = fr.conceptMap(fa.getConceptMap(), fa.getSystem(), fa.getSource(), fa.getTarget(), code);
-                    DvCodedText ct = new DvCodedText();
-                    ct.setDefiningCode(new CodePhrase(
-                            new TerminologyId(c.getSystem(), c.getVersion()),
-                            c.getCode(), c.getDisplay()));
-                    ct.setValue(c.getDisplay());
-                    TermMapping tm = new TermMapping();
-                    tm.setTarget(new CodePhrase(new TerminologyId(fa.getSystem().toString()), code));
-                    tm.setMatch('?');
-                    ct.addMapping(tm);
-                    listed.add(ct);
+                    Codes.addConceptMapResult(listed, fr, fa.getConceptMap(), fa.getSystem(),
+                            fa.getSource(), fa.getTarget(), code);
                 }
             } else {
                 listed.add(o);
             }
         }
         e.setValue(listed);
+    }
+
+    private static final class Codes {
+        private Codes() {
+        }
+
+        private static void addLookupResult(List<Object> listed, FhirResolver fr, URI system,
+                String version, String code) {
+            Coding lookupResult = fr.lookUp(system, version, code);
+            if (lookupResult != null) {
+                listed.add(lookupResult);
+            }
+        }
+
+        private static void addConceptMapResult(List<Object> listed, FhirResolver fr, URI conceptMapUri,
+                URI system, URI source, URI target, String code) {
+            Coding c = fr.conceptMap(conceptMapUri, system, source, target, code);
+            if (c != null) {
+                DvCodedText ct = new DvCodedText();
+                ct.setDefiningCode(new CodePhrase(
+                        new TerminologyId(c.getSystem(), c.getVersion()),
+                        c.getCode(), c.getDisplay()));
+                ct.setValue(c.getDisplay());
+                TermMapping tm = new TermMapping();
+                tm.setTarget(new CodePhrase(new TerminologyId(system.toString()), code));
+                tm.setMatch('?');
+                ct.addMapping(tm);
+                listed.add(ct);
+            }
+        }
     }
 
 }

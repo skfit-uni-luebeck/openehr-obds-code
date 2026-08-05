@@ -87,7 +87,7 @@ import org.tinylog.Logger;
 public final class MedicEtlToolkit {
 
     private static final Cache<String, Object> SPEED = Caffeine.newBuilder()
-            .expireAfterWrite(60, TimeUnit.SECONDS).build();
+            .expireAfterAccess(60, TimeUnit.SECONDS).build();
     private static final Map<String, Map<String, MappingAttributes>> FHIR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, Object> OPENEHR_ATTRIBUTES = new HashMap<>();
     private static final Map<String, MappingAttributes> AQLS = new HashMap<>();
@@ -269,23 +269,37 @@ public final class MedicEtlToolkit {
                     }
                     for (ConsumerRecord<String, String> record : records) {
                         Logger.debug("Processing record.");
-                        try {
-                            Map<String, Object> entries = mapper.readValue(record.value(),
-                                    new TypeReference<LinkedHashMap<String, Object>>() {
-                                    });
-                            Map<String, Object> map = new LinkedHashMap<>();
-                            Map<String, Object> cache = new LinkedHashMap<>();
-                            map.put("datalake_id", entries.get("datalake_id"));
-                            walkTree(entries.entrySet(), 1, "", map, cache);
-                        } catch (ProcessingException e) {
-                            Logger.error("ProcessingException occurred, writing to error topic!", e);
-                            sendToErrorTopic(producer, record.value());
-                        } catch (Exception e) {
-                            Logger.error(
-                                    "Unexpected error processing record, "
-                                            + "wrapping as ProcessingException, writing to error topic!",
-                                    e);
-                            sendToErrorTopic(producer, record.value());
+                        boolean processed = false;
+                        while (!processed) {
+                            try {
+                                Map<String, Object> entries = mapper.readValue(record.value(),
+                                        new TypeReference<LinkedHashMap<String, Object>>() {
+                                        });
+                                Map<String, Object> map = new LinkedHashMap<>();
+                                Map<String, Object> cache = new LinkedHashMap<>();
+                                map.put("datalake_id", entries.get("datalake_id"));
+                                walkTree(entries.entrySet(), 1, "", map, cache);
+                                processed = true;
+                            } catch (ProcessingException e) {
+                                if (!ServerAvailability.allAvailable() && serverCheck.isEnabled()) {
+                                    Logger.info(
+                                            "Processing failed due to unavailable server, "
+                                                    + "retrying after recovery...");
+                                    ServerAvailability.waitUntilAvailable(
+                                            serverCheck.getIntervalMs(), serverCheck.getTimeoutMs());
+                                } else {
+                                    Logger.error("ProcessingException occurred, writing to error topic!", e);
+                                    sendToErrorTopic(producer, record.value());
+                                    processed = true;
+                                }
+                            } catch (Exception e) {
+                                Logger.error(
+                                        "Unexpected error processing record, "
+                                                + "wrapping as ProcessingException, writing to error topic!",
+                                        e);
+                                sendToErrorTopic(producer, record.value());
+                                processed = true;
+                            }
                         }
                         SPEED.put(UUID.randomUUID().toString(), "success");
                     }
