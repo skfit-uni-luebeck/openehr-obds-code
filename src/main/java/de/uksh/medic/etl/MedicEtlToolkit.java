@@ -349,6 +349,26 @@ public final class MedicEtlToolkit {
         }
     }
 
+    private static void precompileGroovyScript(Mapping m) {
+        if (Settings.getDev()) {
+            return;
+        }
+        File groovyFile = new File("scripts", m.getTemplateId() + ".groovy");
+        if (!groovyFile.exists()) {
+            return;
+        }
+        if (groovyClassLoader == null) {
+            groovyClassLoader = new GroovyClassLoader();
+        }
+        try {
+            Class<? extends Script> scriptClass = groovyClassLoader.parseClass(groovyFile);
+            GROOVY_SCRIPTS.put(m.getTemplateId(), scriptClass);
+            Logger.info("Pre-compiled Groovy script for template: {}", m.getTemplateId());
+        } catch (IOException e) {
+            Logger.error("Failed to pre-compile Groovy script for template {}: {}", m.getTemplateId(), e);
+        }
+    }
+
     private static void initializeAttribute(Mapping m, ObjectMapper mapper) {
         if (m.getTemplateId() != null) {
             OPERATIONALTEMPLATE template = null;
@@ -370,23 +390,7 @@ public final class MedicEtlToolkit {
             opts.setSaveSyntheticDocumentElement(new QName("http://schemas.openehr.org/v1", "template"));
             PARSERS.put(m.getTemplateId(), new EHRParser(template.xmlText(opts)));
 
-            // Pre-compile Groovy script for this template
-            if (!Settings.getDev()) {
-                File groovyFile = new File("scripts", m.getTemplateId() + ".groovy");
-                if (!groovyFile.exists()) {
-                    return;
-                }
-                if (groovyClassLoader == null) {
-                    groovyClassLoader = new GroovyClassLoader();
-                }
-                try {
-                    Class<? extends Script> scriptClass = groovyClassLoader.parseClass(groovyFile);
-                    GROOVY_SCRIPTS.put(m.getTemplateId(), scriptClass);
-                    Logger.info("Pre-compiled Groovy script for template: {}", m.getTemplateId());
-                } catch (IOException e) {
-                    Logger.error("Failed to pre-compile Groovy script for template {}: {}", m.getTemplateId(), e);
-                }
-            }
+            precompileGroovyScript(m);
         }
 
         if (m.getSource() == null) {
