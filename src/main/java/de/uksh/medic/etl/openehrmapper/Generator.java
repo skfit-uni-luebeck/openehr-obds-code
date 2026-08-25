@@ -771,7 +771,7 @@ public class Generator {
 
     @SuppressWarnings({ "MagicNumber" })
     public void gen_DV_INTERVAL_DV_QUANTITY_(String path, String name, Object jsonmap,
-            Map<String, Object[]> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
+                Map<String, Object[]> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
         Object[] intervals = map.get(name);
         if (intervals.length != 2) {
             return;
@@ -784,8 +784,14 @@ public class Generator {
             Double magnitude = null;
             Long precision = null;
             String unitDisplayName = null;
+            Boolean included = null;
 
             if (intervals[i] == null) {
+                if (i == 0) {
+                    dvi.setLowerUnbounded(true);
+                } else {
+                    dvi.setUpperUnbounded(true);
+                }
                 continue;
             }
 
@@ -801,10 +807,13 @@ public class Generator {
                         return;
                     }
                     magnitude = Double.valueOf(magnitudeS);
-                    if (m.length == 3) {
+                    if (m.length >= 3) {
                         precision = Long.valueOf(m[2]);
                     }
                     unit = (String) m[1];
+                    if (m.length >= 4) {
+                        included = Boolean.valueOf(m[3]);
+                    }
                 }
                 case Quantity q -> {
                     if (q.getCode() == null) {
@@ -831,7 +840,7 @@ public class Generator {
                 return;
             }
 
-            if (((Element) jsonmap).getValue() != null && isInBounds(path, unit, magnitude, violations)) {
+            if (isInBounds(path, unit, magnitude, violations)) {
                 dvq = new DvQuantity(unit, magnitude, precision);
                 if (unitDisplayName != null) {
                     dvq.setUnitsDisplayName(unitDisplayName);
@@ -840,11 +849,13 @@ public class Generator {
 
             if (i == 0) {
                 dvi.setLower(dvq);
-                dvi.setLowerIncluded(true);
+                dvi.setLowerUnbounded(false);
+                dvi.setLowerIncluded(included != null ? included : true);
             }
             if (i == 1) {
                 dvi.setUpper(dvq);
-                dvi.setUpperIncluded(true);
+                dvi.setUpperUnbounded(false);
+                dvi.setUpperIncluded(included != null ? included : true);
             }
         }
 
