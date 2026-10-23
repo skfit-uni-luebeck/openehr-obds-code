@@ -789,8 +789,10 @@ public class Generator {
             if (intervals[i] == null) {
                 if (i == 0) {
                     dvi.setLowerUnbounded(true);
+                    dvi.setLowerIncluded(false);
                 } else {
                     dvi.setUpperUnbounded(true);
+                    dvi.setUpperIncluded(false);
                 }
                 continue;
             }
