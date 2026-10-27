@@ -10,6 +10,7 @@ import org.hl7.fhir.r4.model.CodeType;
 import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.UriType;
 import org.tinylog.Logger;
+import de.uksh.medic.etl.settings.Settings;
 
 /**
  * Monitors availability of openEHR and FHIR Terminology servers.
@@ -25,6 +26,15 @@ public final class ServerAvailability {
     private static Thread monitorThread;
     private static volatile boolean monitorRunning = true;
 
+    private static final int FAILURES_BEFORE_DOWN = 3;
+    private static final int SUCCESSES_BEFORE_UP = 2;
+
+    private static int openEhrFailures = 0;
+    private static int openEhrSuccesses = 0;
+
+    private static int fhirFailures = 0;
+    private static int fhirSuccesses = 0;
+
     private ServerAvailability() {
     }
 
@@ -35,12 +45,65 @@ public final class ServerAvailability {
      * @param newFhirTsClient  the FHIR terminology client (may be null)
      */
     public static void init(DefaultRestClient newOpenEhrClient, IGenericClient newFhirTsClient) {
-        ServerAvailability.openEhrClient = newOpenEhrClient;
-        ServerAvailability.fhirTsClient = newFhirTsClient;
+        de.uksh.medic.etl.ServerAvailability.openEhrClient = newOpenEhrClient;
+        de.uksh.medic.etl.ServerAvailability.fhirTsClient = newFhirTsClient;
+
+        // If openEHR client is not configured, mark it as available
+        if (openEhrClient == null) {
+            OPENEHR_AVAILABLE.set(true);
+        }
 
         // If FHIR TS client is not configured, mark it as available
         if (fhirTsClient == null) {
             FHIR_TS_AVAILABLE.set(true);
+        }
+    }
+
+    private static synchronized void updateOpenEhrAvailability(boolean success) {
+        boolean wasAvailable = OPENEHR_AVAILABLE.get();
+
+        if (success) {
+            openEhrFailures = 0;
+            openEhrSuccesses++;
+
+            if (!wasAvailable && openEhrSuccesses >= SUCCESSES_BEFORE_UP) {
+                OPENEHR_AVAILABLE.set(true);
+                openEhrSuccesses = 0;
+                Logger.info("openEHR API is now available");
+            }
+        } else {
+            openEhrSuccesses = 0;
+            openEhrFailures++;
+
+            if (wasAvailable && openEhrFailures >= FAILURES_BEFORE_DOWN) {
+                OPENEHR_AVAILABLE.set(false);
+                openEhrFailures = 0;
+                Logger.warn("openEHR API is now unavailable");
+            }
+        }
+    }
+
+    private static synchronized void updateFhirAvailability(boolean success) {
+        boolean wasAvailable = FHIR_TS_AVAILABLE.get();
+
+        if (success) {
+            fhirFailures = 0;
+            fhirSuccesses++;
+
+            if (!wasAvailable && fhirSuccesses >= SUCCESSES_BEFORE_UP) {
+                FHIR_TS_AVAILABLE.set(true);
+                fhirSuccesses = 0;
+                Logger.info("FHIR Terminology Server is now available");
+            }
+        } else {
+            fhirSuccesses = 0;
+            fhirFailures++;
+
+            if (wasAvailable && fhirFailures >= FAILURES_BEFORE_DOWN) {
+                FHIR_TS_AVAILABLE.set(false);
+                fhirFailures = 0;
+                Logger.warn("FHIR Terminology Server is now unavailable");
+            }
         }
     }
 
@@ -50,35 +113,31 @@ public final class ServerAvailability {
      * @param intervalMs interval between checks in milliseconds
      */
     @SuppressWarnings({ "IllegalCatch" })
-    public static void startMonitor(int intervalMs) {
+    public static synchronized void startMonitor(int intervalMs) {
+        if (monitorThread != null && monitorThread.isAlive()) {
+            Logger.debug("Server availability monitor is already running");
+            return;
+        }
+
         monitorThread = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
-                // Only perform checks when monitor is running (not paused)
                 if (monitorRunning) {
                     try {
-                        boolean prevOpenEhr = OPENEHR_AVAILABLE.get();
-                        boolean prevFhirTs = FHIR_TS_AVAILABLE.get();
-
+                        // openEHR uses consecutive success/failure thresholds
                         if (openEhrClient != null) {
-                            OPENEHR_AVAILABLE.set(checkOpenEhr());
-                        }
-                        if (fhirTsClient != null) {
-                            FHIR_TS_AVAILABLE.set(checkFhirTs());
+                            updateOpenEhrAvailability(checkOpenEhr());
                         }
 
-                        // Log state transitions
-                        if (OPENEHR_AVAILABLE.get() && !prevOpenEhr) {
-                            Logger.info("openEHR API is now available");
-                        } else if (!OPENEHR_AVAILABLE.get() && prevOpenEhr) {
-                            Logger.warn("openEHR API is now unavailable");
+                        // FHIR uses the same consecutive success/failure thresholds
+                        if (fhirTsClient != null) {
+                            updateFhirAvailability(checkFhirTs());
                         }
-                        if (FHIR_TS_AVAILABLE.get() && !prevFhirTs) {
-                            Logger.info("FHIR Terminology Server is now available");
-                        } else if (!FHIR_TS_AVAILABLE.get() && prevFhirTs) {
-                            Logger.warn("FHIR Terminology Server is now unavailable");
-                        }
+
                     } catch (Exception e) {
-                        Logger.debug("Error during availability check: {}", e.getMessage());
+                        Logger.warn(
+                                "Error during server availability check: {}",
+                                e.getMessage(), e
+                        );
                     }
                 }
 
@@ -90,9 +149,14 @@ public final class ServerAvailability {
                 }
             }
         }, "server-availability-monitor");
+
         monitorThread.setDaemon(true);
         monitorThread.start();
-        Logger.info("Server availability monitor started with interval {}ms", intervalMs);
+
+        Logger.info(
+                "Server availability monitor started with interval {}ms",
+                intervalMs
+        );
     }
 
     /**
@@ -190,21 +254,61 @@ public final class ServerAvailability {
      * @return true if the FHIR Terminology Server is reachable
      */
     @SuppressWarnings({ "IllegalCatch" })
-    public static boolean checkFhirTs() {
-        if (fhirTsClient == null) {
-            return true;
-        }
+    private static boolean checkFhirTs() {
+        long startNanos = System.nanoTime();
+        String endpoint = String.valueOf(Settings.getFhirServerUrl());
+
         try {
-            Parameters params = new Parameters();
-            params.addParameter("system", new UriType("http://snomed.info/sct"));
-            params.addParameter("code", new CodeType("138875005"));
-            fhirTsClient.operation().onType(CodeSystem.class)
-                    .named("lookup").withParameters(params).useHttpGet().execute();
+            if (fhirTsClient == null) {
+                Logger.warn("FHIR health check skipped: client is null");
+                return false;
+            }
+
+            Logger.debug("FHIR health check starting: endpoint={}", endpoint);
+
+            fhirTsClient.forceConformanceCheck();
+
+            long durationMs =
+                    (System.nanoTime() - startNanos) / 1_000_000;
+
+            Logger.debug(
+                    "FHIR health check succeeded: endpoint={}, durationMs={}",
+                    endpoint, durationMs
+            );
+
             return true;
+
         } catch (Exception e) {
+            long durationMs =
+                    (System.nanoTime() - startNanos) / 1_000_000;
+
+            Logger.warn(
+                    "FHIR health check failed: endpoint={}, durationMs={}, exceptionType={}",
+                    endpoint,
+                    durationMs,
+                    e.getClass().getName(),
+                    e
+            );
+
+            Throwable cause = e.getCause();
+            int depth = 1;
+
+            while (cause != null && depth <= 10) {
+                Logger.warn(
+                        "FHIR failure cause {}: type={}, message={}",
+                        depth,
+                        cause.getClass().getName(),
+                        cause.getMessage()
+                );
+
+                cause = cause.getCause();
+                depth++;
+            }
+
             return false;
         }
     }
+
 
     /**
      * Return true if all configured servers are currently available.
@@ -231,24 +335,32 @@ public final class ServerAvailability {
      * Mark the openEHR API as unavailable (called when connection errors occur
      * during processing).
      */
-    public static void markOpenEhrUnavailable() {
+    public static synchronized void markOpenEhrUnavailable() {
         OPENEHR_AVAILABLE.set(false);
+        openEhrFailures = 0;
+        openEhrSuccesses = 0;
     }
 
     /**
      * Mark the FHIR Terminology Server as unavailable (called when connection
      * errors occur during processing).
      */
-    public static void markFhirTsUnavailable() {
+    public static synchronized void markFhirTsUnavailable() {
         FHIR_TS_AVAILABLE.set(false);
+        fhirFailures = 0;
+        fhirSuccesses = 0;
     }
 
     /**
      * Reset availability flags to false (useful for re-validating after
      * initialization).
      */
-    static void resetAvailability() {
+    static synchronized void resetAvailability() {
         OPENEHR_AVAILABLE.set(false);
         FHIR_TS_AVAILABLE.set(false);
+        openEhrFailures = 0;
+        openEhrSuccesses = 0;
+        fhirFailures = 0;
+        fhirSuccesses = 0;
     }
 }
