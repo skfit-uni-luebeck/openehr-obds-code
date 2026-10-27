@@ -90,10 +90,17 @@ public class Generator {
                 Logger.debug("Encountered null children");
                 return;
             }
-            String type = "gen_" + children.item(i).getFirstChild().getTextContent();
-            if (datatypes != null && datatypes.containsKey(name) && datatypes.get(name) instanceof MappingAttributes
+            String type = normalizeGeneratorType(
+                    children.item(i).getFirstChild().getTextContent());
+
+            if (datatypes != null
+                    && datatypes.containsKey(name)
+                    && datatypes.get(name) instanceof MappingAttributes
                     && ((MappingAttributes) datatypes.get(name)).getDatatype() != null) {
-                String type2 = "gen_" + ((MappingAttributes) datatypes.get(name)).getDatatype();
+
+                String explicitDatatype = ((MappingAttributes) datatypes.get(name)).getDatatype();
+                String type2 = normalizeGeneratorType(explicitDatatype);
+
                 if (!type2.equals(type)) {
                     continue;
                 }
@@ -112,6 +119,12 @@ public class Generator {
                 Logger.error(e);
             }
         }
+    }
+
+    private String normalizeGeneratorType(String datatype) {
+        return "gen_" + datatype
+                .replaceAll("[^A-Za-z_]+", "_")
+                .replace("POINT_", "");
     }
 
     // Navigation Class descriptions
@@ -656,14 +669,28 @@ public class Generator {
     // Text Class descriptions
     // https://specifications.openehr.org/releases/RM/latest/data_types.html#_class_descriptions_2
 
-    public void gen_DV_TEXT(String path, String name, Object jsonmap,
-            Map<String, Object> map, Map<String, Object> datatypes, List<Violation> violations) throws Exception {
+    public void gen_DV_TEXT(
+            String path,
+            String name,
+            Object jsonmap,
+            Map<String, Object> map,
+            Map<String, Object> datatypes,
+            List<Violation> violations) throws Exception {
+
         if (!map.containsKey(name)) {
             return;
-        } else if (map.get(name) instanceof Coding) {
+        }
+
+        Object value = map.get(name);
+
+        if (value instanceof Coding) {
             gen_DV_CODED_TEXT(path, name, jsonmap, map, datatypes, violations);
+        } else if (value instanceof String text) {
+            ((Element) jsonmap).setValue(new DvText(text));
         } else {
-            ((Element) jsonmap).setValue(new DvText((String) map.get(name)));
+            // Do not cast quantity arrays, numbers, or other values to String.
+            Logger.debug("Skipping DV_TEXT for non-text value at {}: {}",
+                    path, value == null ? "null" : value.getClass().getName());
         }
     }
 
