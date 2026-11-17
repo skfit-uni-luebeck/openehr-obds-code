@@ -19,36 +19,49 @@ import org.ehrbase.openehr.sdk.generator.commons.aql.query.Query;
 import org.tinylog.Logger;
 
 /**
- * Monitors the three servers this toolkit depends on: the openEHR server and two FHIR
- * servers — the FHIR Server (data, {@code fhirServerUrl}) and the FHIR Terminology Server
+ * Monitors the three servers this toolkit depends on: the openEHR server and
+ * two FHIR
+ * servers — the FHIR Server (data, {@code fhirServerUrl}) and the FHIR
+ * Terminology Server
  * ({@code fhirTsUrl}).
  *
  * <p>
- * Checks are performed on demand, not on a background timer: they only run when there is
- * actual data to process. A positive verdict is trusted for {@code intervalMs}, a negative
- * verdict is always re-checked against the server, so a stale flag can never block
+ * Checks are performed on demand, not on a background timer: they only run when
+ * there is
+ * actual data to process. A positive verdict is trusted for {@code intervalMs},
+ * a negative
+ * verdict is always re-checked against the server, so a stale flag can never
+ * block
  * processing of an already reachable server.
  * </p>
  *
  * <p>
- * A server counts as available when it answers with an HTTP 2xx response. Every message
- * names the server role and its URL, so the FHIR Server and the FHIR Terminology Server can
+ * A server counts as available when it answers with an HTTP 2xx response. Every
+ * message
+ * names the server role and its URL, so the FHIR Server and the FHIR
+ * Terminology Server can
  * never be confused — even if both settings point to the same host.
  * </p>
  */
 public final class ServerAvailability {
 
     /**
-     * The servers monitored by this class. There are exactly three: one openEHR server and
+     * The servers monitored by this class. There are exactly three: one openEHR
+     * server and
      * two FHIR servers.
      */
     public enum ServerKind {
 
         /** The openEHR repository the compositions are written to. */
         OPENEHR_SERVER("openEHR server", "openEhrUrl", "openEhrServer"),
-        /** The FHIR data server used by the mapping scripts, e.g. for Medication lookups. */
+        /**
+         * The FHIR data server used by the mapping scripts, e.g. for Medication
+         * lookups.
+         */
         FHIR_SERVER("FHIR Server", "fhirServerUrl", "fhirServer"),
-        /** The FHIR terminology server used for CodeSystem and ConceptMap operations. */
+        /**
+         * The FHIR terminology server used for CodeSystem and ConceptMap operations.
+         */
         FHIR_TERMINOLOGY_SERVER("FHIR Terminology Server", "fhirTsUrl", "fhirTerminologyServer");
 
         private final String label;
@@ -97,7 +110,8 @@ public final class ServerAvailability {
         /**
          * Perform the probe.
          *
-         * @return null if the server answered with HTTP 2xx, otherwise a short failure reason
+         * @return null if the server answered with HTTP 2xx, otherwise a short failure
+         *         reason
          */
         String check();
     }
@@ -155,8 +169,10 @@ public final class ServerAvailability {
     /**
      * Configure how the probes are executed.
      *
-     * @param newProbeTimeoutMs maximum duration of a single probe attempt in milliseconds
-     * @param newRetries number of attempts before a server is declared unavailable
+     * @param newProbeTimeoutMs maximum duration of a single probe attempt in
+     *                          milliseconds
+     * @param newRetries        number of attempts before a server is declared
+     *                          unavailable
      */
     public static void configure(int newProbeTimeoutMs, int newRetries) {
         probeTimeoutMs = newProbeTimeoutMs > 0 ? newProbeTimeoutMs : DEFAULT_PROBE_TIMEOUT_MS;
@@ -164,12 +180,13 @@ public final class ServerAvailability {
     }
 
     /**
-     * Register the servers to monitor. A server whose client is null is not configured and
+     * Register the servers to monitor. A server whose client is null is not
+     * configured and
      * therefore never blocks processing.
      *
      * @param openEhrClient the openEHR REST client
-     * @param fhirClient the FHIR data server client (may be null)
-     * @param fhirTsClient the FHIR terminology server client (may be null)
+     * @param fhirClient    the FHIR data server client (may be null)
+     * @param fhirTsClient  the FHIR terminology server client (may be null)
      */
     public static void init(DefaultRestClient openEhrClient, IGenericClient fhirClient, IGenericClient fhirTsClient) {
         Map<ServerKind, MonitoredServer> registry = emptyRegistry();
@@ -188,7 +205,8 @@ public final class ServerAvailability {
     }
 
     /**
-     * Log which servers are monitored, one line per server, so that the openEHR server and
+     * Log which servers are monitored, one line per server, so that the openEHR
+     * server and
      * the two FHIR servers are visible separately.
      */
     public static void logConfiguration() {
@@ -217,17 +235,22 @@ public final class ServerAvailability {
     }
 
     /**
-     * Stop processing until every configured server answers with HTTP 2xx again. This method
-     * never gives up and never reports an error: it logs one message when processing is
+     * Stop processing until every configured server answers with HTTP 2xx again.
+     * This method
+     * never gives up and never reports an error: it logs one message when
+     * processing is
      * paused and one message when it continues.
      *
      * <p>
-     * Positive verdicts that are younger than {@code intervalMs} are trusted, so a healthy
+     * Positive verdicts that are younger than {@code intervalMs} are trusted, so a
+     * healthy
      * setup is probed at most once per {@code intervalMs}.
      * </p>
      *
-     * @param intervalMs pause between repeated checks and validity of a positive verdict
-     * @param warnAfterMs log a reminder at this interval while waiting; 0 logs only the pause
+     * @param intervalMs  pause between repeated checks and validity of a positive
+     *                    verdict
+     * @param warnAfterMs log a reminder at this interval while waiting; 0 logs only
+     *                    the pause
      *                    and the resume message
      */
     public static void awaitServers(int intervalMs, int warnAfterMs) {
@@ -274,7 +297,8 @@ public final class ServerAvailability {
     }
 
     /**
-     * Return true if all configured servers are currently considered available. This reads
+     * Return true if all configured servers are currently considered available.
+     * This reads
      * the cached verdicts and does not probe.
      *
      * @return true if no configured server is marked unavailable
@@ -359,7 +383,8 @@ public final class ServerAvailability {
     }
 
     /**
-     * Mark the FHIR terminology server as unavailable after an error during processing.
+     * Mark the FHIR terminology server as unavailable after an error during
+     * processing.
      *
      * @param reason short description of the failure
      */
@@ -368,7 +393,8 @@ public final class ServerAvailability {
     }
 
     /**
-     * Describe all configured servers that are currently unavailable, including URL and the
+     * Describe all configured servers that are currently unavailable, including URL
+     * and the
      * reason of the last failure.
      *
      * @return comma separated list of unavailable servers or "none"
@@ -378,7 +404,8 @@ public final class ServerAvailability {
     }
 
     /**
-     * Describe all configured servers that are currently available, including their URLs.
+     * Describe all configured servers that are currently available, including their
+     * URLs.
      *
      * @return comma separated list of available servers or "none"
      */
@@ -387,7 +414,8 @@ public final class ServerAvailability {
     }
 
     /**
-     * Build the JSON object of the {@code /health} response describing every server.
+     * Build the JSON object of the {@code /health} response describing every
+     * server.
      *
      * @return a JSON object with one entry per server
      */
@@ -414,8 +442,8 @@ public final class ServerAvailability {
     /**
      * Register a probe for a single server. Used by {@link #init} and by tests.
      *
-     * @param kind the server to register
-     * @param url the URL to report for this server
+     * @param kind  the server to register
+     * @param url   the URL to report for this server
      * @param probe the probe to run, or null if the server is not configured
      */
     static synchronized void register(ServerKind kind, String url, Probe probe) {
@@ -471,12 +499,14 @@ public final class ServerAvailability {
     }
 
     /**
-     * Run a single check for one server, including retries and the watchdog timeout.
+     * Run a single check for one server, including retries and the watchdog
+     * timeout.
      *
      * @param server the server to check
      */
     private static void runCheck(MonitoredServer server) {
-        // While a server is already known to be down the repeated failures are only logged
+        // While a server is already known to be down the repeated failures are only
+        // logged
         // in debug level, so an outage does not flood the log with error messages.
         boolean isNewOutage = server.available.get();
         String failure = null;
@@ -573,7 +603,7 @@ public final class ServerAvailability {
         return server.available.get() ? STATE_OK : STATE_DOWN;
     }
 
-    @SuppressWarnings({"IllegalCatch"})
+    @SuppressWarnings({ "IllegalCatch" })
     private static String probeOpenEhr(DefaultRestClient openEhrClient) {
         try {
             openEhrClient.aqlEndpoint().executeRaw(Query.buildNativeQuery(AQL_PING));
@@ -583,7 +613,7 @@ public final class ServerAvailability {
         }
     }
 
-    @SuppressWarnings({"IllegalCatch"})
+    @SuppressWarnings({ "IllegalCatch" })
     private static String probeFhir(IGenericClient client) {
         try {
             IEntityResult result = client.rawHttpRequest().get(METADATA_PATH).execute();
@@ -628,8 +658,9 @@ public final class ServerAvailability {
     }
 
     private static String pad(String label) {
-        return label.length() >= LABEL_COLUMN_WIDTH ? label + ' ' : String.format("%-" + LABEL_COLUMN_WIDTH + "s",
-                label);
+        return label.length() >= LABEL_COLUMN_WIDTH ? label + ' '
+                : String.format("%-" + LABEL_COLUMN_WIDTH + "s",
+                        label);
     }
 
     private static void sleep(int millis) {

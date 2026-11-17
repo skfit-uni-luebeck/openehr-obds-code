@@ -90,10 +90,17 @@ public class Generator {
                 Logger.debug("Encountered null children");
                 return;
             }
-            String type = "gen_" + children.item(i).getFirstChild().getTextContent();
-            if (datatypes != null && datatypes.containsKey(name) && datatypes.get(name) instanceof MappingAttributes
+            String type = normalizeGeneratorType(
+                    children.item(i).getFirstChild().getTextContent());
+
+            if (datatypes != null
+                    && datatypes.containsKey(name)
+                    && datatypes.get(name) instanceof MappingAttributes
                     && ((MappingAttributes) datatypes.get(name)).getDatatype() != null) {
-                String type2 = "gen_" + ((MappingAttributes) datatypes.get(name)).getDatatype();
+
+                String explicitDatatype = ((MappingAttributes) datatypes.get(name)).getDatatype();
+                String type2 = normalizeGeneratorType(explicitDatatype);
+
                 if (!type2.equals(type)) {
                     continue;
                 }
@@ -112,6 +119,12 @@ public class Generator {
                 Logger.error(e);
             }
         }
+    }
+
+    private String normalizeGeneratorType(String datatype) {
+        return "gen_" + datatype
+                .replaceAll("[^A-Za-z_]+", "_")
+                .replace("POINT_", "");
     }
 
     // Navigation Class descriptions
@@ -789,8 +802,10 @@ public class Generator {
             if (intervals[i] == null) {
                 if (i == 0) {
                     dvi.setLowerUnbounded(true);
+                    dvi.setLowerIncluded(false);
                 } else {
                     dvi.setUpperUnbounded(true);
+                    dvi.setUpperIncluded(false);
                 }
                 continue;
             }
