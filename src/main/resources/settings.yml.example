@@ -22,17 +22,19 @@ kafka:
   errorTopic:
   pollDuration:
   pollRecords:
+# Each path maps to a LIST of mappings (note the "-" below), even if there is only one.
 mapping:
   /Patient:
-    source: obds-patient
-    sourceVersion: 1
-    target: openehr-obds-patient
-    targetVersion: 1
-    split: false
-    global: false
-    templateId:
-    update: false
-    list: false
+    -
+      source: obds-patient
+      sourceVersion: 1
+      target: openehr-obds-patient
+      targetVersion: 1
+      split: false
+      global: false
+      templateId: oBDS_Patient
+      update: false
+      list: false
 depthLimit: 4
 systemId:
 dev: false
@@ -40,6 +42,17 @@ namespace:
 cacheSize:
 testDataDir:
 serverCheck:
+  # Availability checks for the three servers of this toolkit:
+  #   openEhrUrl    -> openEHR server
+  #   fhirServerUrl -> FHIR Server (data, used by the mapping scripts)
+  #   fhirTsUrl     -> FHIR Terminology Server (CodeSystem/ConceptMap operations)
+  # A configured server counts as available only if it answers with HTTP 2xx.
+  # The checks are only performed when there is data to process, an idle
+  # toolkit does not probe the servers at all. If a server is unavailable,
+  # processing stops and waits until all servers answer again - records are
+  # neither skipped nor written to the error topic because of a server outage.
   enabled: true
-  intervalMs: 5000
-  timeoutMs: 0
+  intervalMs: 5000      # pause between repeated checks and validity of a positive result
+  timeoutMs: 0          # log a reminder at this interval while waiting (0 = only pause/resume messages)
+  probeTimeoutMs: 5000  # maximum duration of a single check attempt
+  retries: 3            # attempts per server before it is declared unavailable

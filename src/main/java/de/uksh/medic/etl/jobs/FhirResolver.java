@@ -1,6 +1,7 @@
 package de.uksh.medic.etl.jobs;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.client.apache.ApacheRestfulClientFactory;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.exceptions.FhirClientConnectionException;
 import ca.uhn.fhir.rest.client.interceptor.AdditionalRequestHeadersInterceptor;
@@ -21,6 +22,8 @@ import org.tinylog.Logger;
 public final class FhirResolver {
 
     private static final int CACHESIZE = Settings.getCacheSize();
+    private static final int CONNECT_TIMEOUT_MS = 10000;
+    private static final int READ_TIMEOUT_MS = 30000;
     private static final FhirContext CTX = FhirContext.forR4();
     private static final Cache<String, Coding> CACHE_LOOKUP = Caffeine.newBuilder()
             .expireAfterAccess(24, TimeUnit.HOURS).maximumSize(CACHESIZE).build();
@@ -29,6 +32,7 @@ public final class FhirResolver {
     private static final Cache<String, Boolean> CACHE_AVAILABLE = Caffeine.newBuilder()
             .expireAfterAccess(24, TimeUnit.HOURS).maximumSize(CACHESIZE).build();
     private static IGenericClient terminologyClient;
+    private static String terminologyUrl;
 
     /**
      * Initializes the class by creating clients for clinical data and terminology.
@@ -38,7 +42,14 @@ public final class FhirResolver {
             String topicName = (Settings.getKafka() != null && Settings.getKafka().getReadTopic() != null
                     && !"".equals(Settings.getKafka().getReadTopic())) ? Settings.getKafka().getReadTopic()
                             : "JVM-ETL Dev";
-            terminologyClient = CTX.newRestfulGenericClient(Settings.getFhirTsUrl().toString());
+            terminologyUrl = Settings.getFhirTsUrl().toString();
+
+            ApacheRestfulClientFactory factory = new ApacheRestfulClientFactory(CTX);
+            factory.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            factory.setSocketTimeout(READ_TIMEOUT_MS);
+            CTX.setRestfulClientFactory(factory);
+
+            terminologyClient = CTX.newRestfulGenericClient(terminologyUrl);
             AdditionalRequestHeadersInterceptor interceptor = new AdditionalRequestHeadersInterceptor();
             interceptor.addHeaderValue("User-Agent", topicName);
             terminologyClient.registerInterceptor(interceptor);
@@ -67,6 +78,10 @@ public final class FhirResolver {
      *         terminology server could not be reached
      */
     private static Boolean codeSystemAvailable(URI system, String version) {
+        if (terminologyClient == null) {
+            ServerAvailability.logMissingTerminologyServer();
+            return null;
+        }
         String key = system + "|" + version;
         if (Boolean.TRUE.equals(CACHE_AVAILABLE.getIfPresent(key))) {
             return Boolean.TRUE;
@@ -82,14 +97,15 @@ public final class FhirResolver {
 
             if (bundle.getEntry().isEmpty()) {
                 CACHE_AVAILABLE.invalidate(key);
-                Logger.error("CodeSystem {} version {} was not found.", system, version);
+                Logger.error("CodeSystem {} version {} was not found on FHIR Terminology Server [{}].",
+                        system, version, terminologyUrl);
                 return Boolean.FALSE;
             }
             CACHE_AVAILABLE.put(key, Boolean.TRUE);
             return Boolean.TRUE;
         } catch (FhirClientConnectionException e) {
-            ServerAvailability.markFhirTsUnavailable();
-            Logger.error("Could not connect to FHIR Terminology Server", e);
+            ServerAvailability.markFhirTsUnavailable("connection error: " + e.getMessage());
+            Logger.error("Could not connect to FHIR Terminology Server [{}]", terminologyUrl, e);
             return null;
         }
     }
@@ -108,6 +124,10 @@ public final class FhirResolver {
      *         terminology server could not be reached
      */
     private static Boolean conceptMapAvailable(URI conceptMapUri) {
+        if (terminologyClient == null) {
+            ServerAvailability.logMissingTerminologyServer();
+            return null;
+        }
         String key = conceptMapUri.toString();
         if (Boolean.TRUE.equals(CACHE_AVAILABLE.getIfPresent(key))) {
             return Boolean.TRUE;
@@ -122,14 +142,15 @@ public final class FhirResolver {
 
             if (bundle.getEntry().isEmpty()) {
                 CACHE_AVAILABLE.invalidate(key);
-                Logger.error("ConceptMap {} was not found.", conceptMapUri);
+                Logger.error("ConceptMap {} was not found on FHIR Terminology Server [{}].",
+                        conceptMapUri, terminologyUrl);
                 return Boolean.FALSE;
             }
             CACHE_AVAILABLE.put(key, Boolean.TRUE);
             return Boolean.TRUE;
         } catch (FhirClientConnectionException e) {
-            ServerAvailability.markFhirTsUnavailable();
-            Logger.error("Could not connect to FHIR Terminology Server", e);
+            ServerAvailability.markFhirTsUnavailable("connection error: " + e.getMessage());
+            Logger.error("Could not connect to FHIR Terminology Server [{}]", terminologyUrl, e);
             return null;
         }
     }
@@ -180,8 +201,8 @@ public final class FhirResolver {
             }
 
         } catch (FhirClientConnectionException e) {
-            ServerAvailability.markFhirTsUnavailable();
-            Logger.error("Could not connect to FHIR Terminology Server", e);
+            ServerAvailability.markFhirTsUnavailable("connection error: " + e.getMessage());
+            Logger.error("Could not connect to FHIR Terminology Server [{}]", terminologyUrl, e);
         }
         Logger.warn("Could not map code {} from {} to {}", input, source, target);
         return null;
@@ -236,8 +257,8 @@ public final class FhirResolver {
             return coding;
 
         } catch (FhirClientConnectionException e) {
-            ServerAvailability.markFhirTsUnavailable();
-            Logger.error("Could not connect to FHIR Terminology Server", e);
+            ServerAvailability.markFhirTsUnavailable("connection error: " + e.getMessage());
+            Logger.error("Could not connect to FHIR Terminology Server [{}]", terminologyUrl, e);
         } catch (ResourceNotFoundException e) {
             Logger.warn("Code " + code + " was not found in CodeSystem " + system + ".", e);
         }
@@ -315,8 +336,8 @@ public final class FhirResolver {
             return coding;
 
         } catch (FhirClientConnectionException e) {
-            ServerAvailability.markFhirTsUnavailable();
-            Logger.error("Could not connect to FHIR Terminology Server", e);
+            ServerAvailability.markFhirTsUnavailable("connection error: " + e.getMessage());
+            Logger.error("Could not connect to FHIR Terminology Server [{}]", terminologyUrl, e);
         } catch (ResourceNotFoundException e) {
             Logger.warn("Code " + code + " was not found in CodeSystem " + system + ".", e);
         }

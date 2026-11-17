@@ -3,6 +3,7 @@ package de.uksh.medic.etl;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.client.apache.ApacheRestfulClientFactory;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.client.exceptions.FhirClientConnectionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,6 +66,7 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.xml.namespace.QName;
 import javax.xml.xpath.XPathExpressionException;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.kafka.clients.consumer.CommitFailedException;
@@ -97,6 +99,9 @@ public final class MedicEtlToolkit {
     private static Integer i = 0;
     private static final int DEFAULT_RECONNECT_DELAY_MS = 1000;
     private static final int MAX_RECONNECT_DELAY_MS = 30000;
+    private static final int FHIR_CONNECT_TIMEOUT_MS = 10000;
+    private static final int FHIR_READ_TIMEOUT_MS = 30000;
+    private static final int MAX_CAUSE_DEPTH = 10;
     private static DefaultRestClient openEhrClient;
     private static Map<String, Object> openehrDatatypes = new HashMap<>();
     private static FhirResolver fr;
@@ -123,6 +128,9 @@ public final class MedicEtlToolkit {
 
         if (Settings.getFhirServerUrl() != null) {
             FhirContext fcCtx = FhirContext.forR4();
+            ApacheRestfulClientFactory factory = new ApacheRestfulClientFactory(fcCtx);
+            factory.setConnectTimeout(FHIR_CONNECT_TIMEOUT_MS);
+            factory.setSocketTimeout(FHIR_READ_TIMEOUT_MS);
 
             if (Settings.getFhirServerKeystore() != null) {
 
@@ -138,16 +146,23 @@ public final class MedicEtlToolkit {
                 SSLContext sslContext = SSLContext.getInstance("TLS");
                 sslContext.init(kmf.getKeyManagers(), null, null);
 
-                CloseableHttpClient httpClient = HttpClients.custom()
-                        .setSSLContext(sslContext)
+                // Timeouts must be set on the client itself: a client assigned to the factory
+                // overrides the timeout settings of the factory.
+                RequestConfig requestConfig = RequestConfig.custom()
+                        .setConnectTimeout(FHIR_CONNECT_TIMEOUT_MS)
+                        .setConnectionRequestTimeout(FHIR_CONNECT_TIMEOUT_MS)
+                        .setSocketTimeout(FHIR_READ_TIMEOUT_MS)
                         .build();
 
-                ApacheRestfulClientFactory factory = new ApacheRestfulClientFactory(fcCtx);
-                factory.setHttpClient(httpClient);
-                fcCtx.setRestfulClientFactory(factory);
+                CloseableHttpClient httpClient = HttpClients.custom()
+                        .setSSLContext(sslContext)
+                        .setDefaultRequestConfig(requestConfig)
+                        .build();
 
+                factory.setHttpClient(httpClient);
             }
 
+            fcCtx.setRestfulClientFactory(factory);
             fc = fcCtx.newRestfulGenericClient(Settings.getFhirServerUrl().toString());
         }
 
@@ -167,8 +182,15 @@ public final class MedicEtlToolkit {
 
         openEhrClient = new DefaultRestClient(new OpenEhrClientConfig(ehrBaseUrl));
 
-        // Initialize server availability monitoring
-        ServerAvailability.init(openEhrClient, fhirTsClient);
+        // Initialize the availability checks for the openEHR server and the two FHIR servers
+        ServerCheckSettings serverCheck = Settings.getServerCheck();
+        ServerAvailability.configure(serverCheck.getProbeTimeoutMs(), serverCheck.getRetries());
+        ServerAvailability.init(openEhrClient, fc, fhirTsClient);
+        if (serverCheck.isEnabled()) {
+            ServerAvailability.logConfiguration();
+        } else {
+            Logger.info("Server availability checks are disabled (serverCheck.enabled: false)");
+        }
 
         ObjectMapper mapper;
         JsonMapper jm = new JsonMapper();
@@ -181,30 +203,19 @@ public final class MedicEtlToolkit {
 
         Settings.getMapping().values().forEach(m -> m.forEach(n -> initializeAttribute(n, jm)));
 
-        // Start server availability monitoring and wait for servers
-        ServerCheckSettings serverCheck = Settings.getServerCheck();
-        if (serverCheck.isEnabled()) {
-            ServerAvailability.startMonitor(serverCheck.getIntervalMs());
-
-            if (!ServerAvailability.waitUntilAvailable(serverCheck.getIntervalMs(), serverCheck.getTimeoutMs())) {
-                Logger.error("Servers not available within timeout, shutting down");
-                System.exit(1);
-            }
-        }
-
         spark.Spark.get("/health", (request, response) -> {
             response.type("application/json");
-            return "{\"msgsPerMinute\": " + SPEED.estimatedSize() + ", \"cacheSize\": " + fr.getCacheSize() + "}";
+            return "{\"msgsPerMinute\": " + SPEED.estimatedSize()
+                    + ", \"cacheSize\": " + fr.getCacheSize()
+                    + ", \"servers\": " + ServerAvailability.statusJson() + "}";
         });
 
         Logger.info("MedicEtlToolkit started!");
 
         if (Settings.getKafka().getUrl() == null || Settings.getKafka().getUrl().isEmpty()) {
             Logger.debug("Kafka URL not set, loading local file");
-            // Pause monitor during local file processing
-            if (serverCheck.isEnabled()) {
-                ServerAvailability.pauseMonitor();
-            }
+            // Local files are data to process, so processing waits for all servers
+            awaitServersIfEnabled(serverCheck);
             File[] files = new File(Settings.getTestDataDir()).listFiles();
             for (File f : files) {
                 if (f.isDirectory()) {
@@ -246,27 +257,20 @@ public final class MedicEtlToolkit {
                 reconnectDelay = DEFAULT_RECONNECT_DELAY_MS;
 
                 while (true) {
-                    // Check server availability before polling
-                    if (serverCheck.isEnabled() && !ServerAvailability.allAvailable()) {
-                        Logger.info("Server unavailable, waiting before next poll...");
-                        try {
-                            Thread.sleep(serverCheck.getIntervalMs());
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
-                        continue;
-                    }
-
                     Logger.debug("Polling Kafka topic");
                     ConsumerRecords<String, String> records = consumer.poll(
                             Duration.ofMillis(Settings.getKafka().getPollDuration()));
 
-                    // Pause server availability monitor during data processing
-                    // to avoid unnecessary FHIR server queries while processing
-                    if (serverCheck.isEnabled()) {
-                        ServerAvailability.pauseMonitor();
+                    if (records.isEmpty()) {
+                        // There is nothing to process, so no server is checked
+                        continue;
                     }
+
+                    // There is data to process: wait until the openEHR server and both FHIR
+                    // servers are available, then continue with this batch
+                    awaitServersIfEnabled(serverCheck);
+
+                    Logger.info("Processing {} record(s)", records.count());
                     for (ConsumerRecord<String, String> record : records) {
                         Logger.debug("Processing record.");
                         boolean processed = false;
@@ -281,12 +285,10 @@ public final class MedicEtlToolkit {
                                 walkTree(entries.entrySet(), 1, "", map, cache);
                                 processed = true;
                             } catch (ProcessingException e) {
-                                if (!ServerAvailability.allAvailable() && serverCheck.isEnabled()) {
-                                    Logger.info(
-                                            "Processing failed due to unavailable server, "
-                                                    + "retrying after recovery...");
-                                    ServerAvailability.waitUntilAvailable(
-                                            serverCheck.getIntervalMs(), serverCheck.getTimeoutMs());
+                                // A live check tells apart a server problem (wait and retry)
+                                // from a problem with the record itself (error topic).
+                                if (serverCheck.isEnabled() && !ServerAvailability.checkAll()) {
+                                    awaitServersIfEnabled(serverCheck);
                                 } else {
                                     Logger.error("ProcessingException occurred, writing to error topic!", e);
                                     sendToErrorTopic(producer, record.value());
@@ -309,15 +311,7 @@ public final class MedicEtlToolkit {
                         Logger.warn(
                                 "CommitFailedException: consumer got kicked out of consumer "
                                         + "group. Breaking inner loop to re-subscribe.");
-                        // Resume monitor before breaking
-                        if (serverCheck.isEnabled()) {
-                            ServerAvailability.resumeMonitor();
-                        }
                         break; // Break inner loop to allow consumer group rebalance
-                    }
-                    // Resume server availability monitor after processing
-                    if (serverCheck.isEnabled()) {
-                        ServerAvailability.resumeMonitor();
                     }
                 }
             } catch (WakeupException e) {
@@ -473,12 +467,65 @@ public final class MedicEtlToolkit {
                     script.setBinding(b);
                     return script.run();
                 } catch (Exception e) {
+                    markFhirServerOnConnectionFailure(e);
                     throw new ProcessingException(e);
                 }
             }
         }
 
         return new HashMap<>();
+    }
+
+    /**
+     * Wait until the openEHR server and both FHIR servers are available before processing
+     * continues. If the availability checks are switched off, a fixed pause is used instead so
+     * that a failing operation is simply retried.
+     *
+     * @param serverCheck the availability check settings
+     */
+    private static void awaitServersIfEnabled(ServerCheckSettings serverCheck) {
+        if (serverCheck.isEnabled()) {
+            ServerAvailability.awaitServers(serverCheck.getIntervalMs(), serverCheck.getTimeoutMs());
+        } else {
+            try {
+                TimeUnit.MILLISECONDS.sleep(serverCheck.getIntervalMs());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
+     * Mark the FHIR Server (data) as unavailable if the given exception was caused by a FHIR
+     * connection failure.
+     *
+     * @param exception the exception thrown while executing a mapping script
+     */
+    private static void markFhirServerOnConnectionFailure(Exception exception) {
+        if (isFhirConnectionFailure(exception)) {
+            ServerAvailability.markFhirServerUnavailable(
+                    "connection error during script execution: " + exception.getMessage());
+        }
+    }
+
+    /**
+     * Check whether an exception was caused by a connection problem of a FHIR server.
+     * Connection errors of the FHIR Terminology Server are handled inside FhirResolver and
+     * never reach this point, so a FHIR connection error here always comes from the FHIR
+     * Server (fhirClient) that is handed to the mapping scripts.
+     *
+     * @param throwable the exception thrown while executing a mapping script
+     * @return true if the exception was caused by a FHIR connection failure
+     */
+    private static boolean isFhirConnectionFailure(Throwable throwable) {
+        Throwable cause = throwable;
+        for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++) {
+            if (cause instanceof FhirClientConnectionException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -678,13 +725,10 @@ public final class MedicEtlToolkit {
                     throw new ProcessingException();
                 }
             } catch (WrongStatusCodeException e) {
-                ServerAvailability.markOpenEhrUnavailable();
-                Logger.error("Unable to create EHR due to internal server error. Trying again. Error was: {}",
+                ServerAvailability.markOpenEhrUnavailable("EHR creation failed: " + e.getMessage());
+                Logger.warn("Unable to create EHR, waiting until all servers are available again. Error was: {}",
                         e.getMessage());
-                try {
-                    TimeUnit.SECONDS.sleep(5);
-                } catch (InterruptedException e1) {
-                }
+                awaitServersIfEnabled(Settings.getServerCheck());
             }
         } while (ehrId == null);
 
@@ -702,7 +746,7 @@ public final class MedicEtlToolkit {
         try {
             openEhrClient.compositionEndpoint(ehrId).mergeRaw(composition);
         } catch (WrongStatusCodeException e) {
-            ServerAvailability.markOpenEhrUnavailable();
+            ServerAvailability.markOpenEhrUnavailable("composition upload failed: " + e.getMessage());
             String comp = "";
             try {
                 JacksonUtil.getObjectMapper().writeValueAsString(composition);

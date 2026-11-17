@@ -13,6 +13,75 @@ To get started, copy the `settings.yaml.example` file to `settings.yaml`. This a
 MeDIC-ETL-Toolkit is also available as a container. The image is available at `ghcr.io/skfit-uni-luebeck/medic-etl-toolkit:latest`. There are native builds available for `linux/amd64` and `linux/arm64/v8`.
 There is also a compose file available.
 
+## Server availability checks
+
+The toolkit uses exactly three servers and checks each of them separately:
+
+| Server | Settings key | Checked by |
+|---|---|---|
+| openEHR server | `openEhrUrl` | AQL query `SELECT e/ehr_id/value FROM EHR e LIMIT 1` |
+| FHIR Server (data) | `fhirServerUrl` | `GET {base}/metadata` |
+| FHIR Terminology Server | `fhirTsUrl` | `GET {base}/metadata` |
+
+A server counts as available when it answers with an HTTP 2xx response; a 4xx/5xx answer or a
+connection failure marks it unavailable. Every log message names the server and its URL, so the
+FHIR Server and the FHIR Terminology Server can be told apart even if both settings point to the
+same host:
+
+```
+INFO  Availability checks: 1 openEHR server + 2 FHIR servers, checked when data arrives
+INFO    openEHR server           https://ehr.example.org/ehr/
+INFO    FHIR Server              https://fhir.example.org/fhir/
+INFO    FHIR Terminology Server  https://ontoserver.example.org/fhir/
+WARN  FHIR Terminology Server [https://ontoserver.example.org/fhir/] is now unavailable (HTTP 403)
+WARN  Pausing processing until all servers are available. Unavailable: FHIR Terminology Server [https://ontoserver.example.org/fhir/] (HTTP 403). Available: openEHR server [https://ehr.example.org/ehr/], FHIR Server [https://fhir.example.org/fhir/]
+INFO  FHIR Terminology Server [https://ontoserver.example.org/fhir/] is now available
+INFO  Resuming processing after 47s: all servers are available again: openEHR server [...], FHIR Server [...], FHIR Terminology Server [...]
+```
+
+The checks are only performed when there is actually data to process: an idle toolkit does not
+probe at all, and a successful check is trusted for `intervalMs` before the servers are probed
+again.
+
+**If a server is unavailable the toolkit stops processing and waits — it does not skip records,
+does not write them to the error topic and does not keep logging errors.** It logs once when
+processing is paused (naming the unavailable servers and the reason), retries the servers every
+`intervalMs` at debug level, and logs once when all servers answer again and processing
+continues. Records are only committed after they were processed, so nothing is lost while the
+toolkit waits. If a server goes down while a record is being processed, the servers are checked
+freshly (never from a cached verdict): a server problem pauses the record, a problem with the
+record itself is still written to the error topic.
+
+`GET /health` reports the current verdict of every server:
+
+```json
+{"msgsPerMinute": 12, "cacheSize": {"lookup": 3, "conceptMap": 1}, "servers": {
+  "openEhrServer": {"url": "https://ehr.example.org/ehr/", "configured": true, "available": true,
+                     "state": "ok", "lastCheckEpochMs": 1763387941012, "lastError": null},
+  "fhirServer": {"url": "https://fhir.example.org/fhir/", "configured": true, "available": true,
+                 "state": "ok", "lastCheckEpochMs": 1763387941087, "lastError": null},
+  "fhirTerminologyServer": {"url": "https://ontoserver.example.org/fhir/", "configured": true,
+                            "available": false, "state": "down", "lastCheckEpochMs": 1763387941201,
+                            "lastError": "HTTP 403"}}}
+```
+
+`state` is `ok`, `down`, `unknown` (not checked yet, e.g. because no data arrived) or
+`not-configured`.
+
+Settings (`serverCheck` in `settings.yml`):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` | switch the checks off entirely |
+| `intervalMs` | `5000` | pause between repeated checks and validity of a positive result |
+| `timeoutMs` | `0` | log a reminder at this interval while waiting; `0` logs only the pause and the resume message |
+| `probeTimeoutMs` | `5000` | maximum duration of a single check attempt |
+| `retries` | `3` | attempts per server before it is declared unavailable |
+
+Waiting for a server longer than the Kafka consumer's `max.poll.interval.ms` makes the broker
+rebalance the consumer group; the uncommitted records are simply redelivered once the servers
+answer again. Set `enabled: false` to switch the checks off completely.
+
 ## Citation
 
 This work was published and presented at the 34th [Medical Informatics Europe Conference (EFMI)](https://efmi.org/2023/12/16/34th-medical-informatics-europe-conference-mie2024-athens-greece-25-to-29-august-2024/).
